@@ -1,0 +1,493 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          whatsapp_number: string | null;
+          country: string;
+          city: string | null;
+          preferred_currency: string;
+          balance: number;
+          verification_status: string;
+          avatar_url: string | null;
+          role: 'user' | 'admin' | 'super_admin' | 'collaborator';
+          theme_preference: 'light' | 'dark' | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          phone?: string | null;
+          whatsapp_number?: string | null;
+          country?: string;
+          city?: string | null;
+          preferred_currency?: string;
+          balance?: number;
+          verification_status?: string;
+          avatar_url?: string | null;
+          role?: 'user' | 'admin' | 'super_admin' | 'collaborator';
+          theme_preference?: 'light' | 'dark' | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          full_name?: string | null;
+          phone?: string | null;
+          whatsapp_number?: string | null;
+          country?: string;
+          city?: string | null;
+          preferred_currency?: string;
+          balance?: number;
+          verification_status?: string;
+          avatar_url?: string | null;
+          role?: 'user' | 'admin' | 'super_admin' | 'collaborator';
+          theme_preference?: 'light' | 'dark' | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      vehicles: {
+        Row: {
+          id: string;
+          source: string;
+          source_id: string;
+          source_url: string | null;
+          make: string;
+          model: string;
+          year: number | null;
+          mileage: number | null;
+          engine_cc: number | null;
+          transmission: string | null;
+          fuel_type: string | null;
+          color: string | null;
+          body_type: string | null;
+          drive_type: string | null;
+          grade: string | null;
+          start_price_usd: number | null;
+          current_price_usd: number | null;
+          buy_now_price_usd: number | null;
+          status: string | null;
+          is_visible: boolean;
+          lot_number: string | null;
+          images: string[] | null;
+          video_url: string | null;
+          has_360_view: boolean;
+          views_count: number;
+          favorites_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          source: string;
+          source_id: string;
+          source_url?: string | null;
+          make: string;
+          model: string;
+          year?: number | null;
+          mileage?: number | null;
+          engine_cc?: number | null;
+          transmission?: string | null;
+          fuel_type?: string | null;
+          color?: string | null;
+          body_type?: string | null;
+          drive_type?: string | null;
+          grade?: string | null;
+          start_price_usd?: number | null;
+          current_price_usd?: number | null;
+          buy_now_price_usd?: number | null;
+          status?: string | null;
+          is_visible?: boolean;
+          lot_number?: string | null;
+          images?: string[] | null;
+          video_url?: string | null;
+          has_360_view?: boolean;
+          views_count?: number;
+          favorites_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          source?: string;
+          source_id?: string;
+          source_url?: string | null;
+          make?: string;
+          model?: string;
+          year?: number | null;
+          mileage?: number | null;
+          engine_cc?: number | null;
+          transmission?: string | null;
+          fuel_type?: string | null;
+          color?: string | null;
+          body_type?: string | null;
+          drive_type?: string | null;
+          grade?: string | null;
+          start_price_usd?: number | null;
+          current_price_usd?: number | null;
+          buy_now_price_usd?: number | null;
+          status?: string | null;
+          is_visible?: boolean;
+          lot_number?: string | null;
+          images?: string[] | null;
+          video_url?: string | null;
+          has_360_view?: boolean;
+          views_count?: number;
+          favorites_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      orders: {
+        Row: {
+          id: string;
+          user_id: string;
+          vehicle_id: string;
+          bid_id: string | null;
+          quote_id: string | null;
+          order_number: string | null;
+          vehicle_make: string | null;
+          vehicle_model: string | null;
+          vehicle_year: number | null;
+          vehicle_source: string | null;
+          vehicle_price_usd: number | null;
+          shipping_price_usd: number | null;
+          insurance_price_usd: number | null;
+          customs_estimate_usd: number | null;
+          total_price_usd: number | null;
+          shipping_cost_xaf: number | null;
+          insurance_cost_xaf: number | null;
+          total_cost_xaf: number | null;
+          // Deposit payment
+          deposit_amount_usd: number | null;
+          deposit_amount_xaf: number | null;
+          deposit_paid_at: string | null;
+          deposit_payment_method: string | null;
+          deposit_payment_reference: string | null;
+          // Balance payment
+          balance_amount_xaf: number | null;
+          balance_paid_at: string | null;
+          balance_payment_method: string | null;
+          balance_payment_reference: string | null;
+          // Destination
+          destination_country: string | null;
+          destination_port: string | null;
+          destination_name: string | null;
+          destination_city: string | null;
+          shipping_method: string | null;
+          shipping_type: string | null;
+          container_type: string | null;
+          // Customer info
+          customer_name: string | null;
+          customer_email: string | null;
+          customer_whatsapp: string | null;
+          customer_country: string | null;
+          // Status & tracking
+          status: string;
+          documents: Json;
+          uploaded_documents: Json | null;
+          documents_sent_at: string | null;
+          tracking_number: string | null;
+          tracking_url: string | null;
+          shipping_eta: string | null;
+          estimated_arrival: string | null;
+          customer_notes: string | null;
+          admin_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          vehicle_id: string;
+          bid_id?: string | null;
+          quote_id?: string | null;
+          order_number?: string | null;
+          vehicle_make?: string | null;
+          vehicle_model?: string | null;
+          vehicle_year?: number | null;
+          vehicle_source?: string | null;
+          vehicle_price_usd?: number | null;
+          shipping_price_usd?: number | null;
+          insurance_price_usd?: number | null;
+          customs_estimate_usd?: number | null;
+          total_price_usd?: number | null;
+          shipping_cost_xaf?: number | null;
+          insurance_cost_xaf?: number | null;
+          total_cost_xaf?: number | null;
+          deposit_amount_usd?: number | null;
+          deposit_amount_xaf?: number | null;
+          deposit_paid_at?: string | null;
+          deposit_payment_method?: string | null;
+          deposit_payment_reference?: string | null;
+          balance_amount_xaf?: number | null;
+          balance_paid_at?: string | null;
+          balance_payment_method?: string | null;
+          balance_payment_reference?: string | null;
+          destination_country?: string | null;
+          destination_port?: string | null;
+          destination_name?: string | null;
+          destination_city?: string | null;
+          shipping_method?: string | null;
+          shipping_type?: string | null;
+          container_type?: string | null;
+          customer_name?: string | null;
+          customer_email?: string | null;
+          customer_whatsapp?: string | null;
+          customer_country?: string | null;
+          status?: string;
+          documents?: Json;
+          uploaded_documents?: Json | null;
+          documents_sent_at?: string | null;
+          tracking_number?: string | null;
+          tracking_url?: string | null;
+          shipping_eta?: string | null;
+          estimated_arrival?: string | null;
+          customer_notes?: string | null;
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          vehicle_id?: string;
+          bid_id?: string | null;
+          quote_id?: string | null;
+          order_number?: string | null;
+          vehicle_make?: string | null;
+          vehicle_model?: string | null;
+          vehicle_year?: number | null;
+          vehicle_source?: string | null;
+          vehicle_price_usd?: number | null;
+          shipping_price_usd?: number | null;
+          insurance_price_usd?: number | null;
+          customs_estimate_usd?: number | null;
+          total_price_usd?: number | null;
+          shipping_cost_xaf?: number | null;
+          insurance_cost_xaf?: number | null;
+          total_cost_xaf?: number | null;
+          deposit_amount_usd?: number | null;
+          deposit_amount_xaf?: number | null;
+          deposit_paid_at?: string | null;
+          deposit_payment_method?: string | null;
+          deposit_payment_reference?: string | null;
+          balance_amount_xaf?: number | null;
+          balance_paid_at?: string | null;
+          balance_payment_method?: string | null;
+          balance_payment_reference?: string | null;
+          destination_country?: string | null;
+          destination_port?: string | null;
+          destination_name?: string | null;
+          destination_city?: string | null;
+          shipping_method?: string | null;
+          shipping_type?: string | null;
+          container_type?: string | null;
+          customer_name?: string | null;
+          customer_email?: string | null;
+          customer_whatsapp?: string | null;
+          customer_country?: string | null;
+          status?: string;
+          documents?: Json;
+          uploaded_documents?: Json | null;
+          documents_sent_at?: string | null;
+          tracking_number?: string | null;
+          tracking_url?: string | null;
+          shipping_eta?: string | null;
+          estimated_arrival?: string | null;
+          customer_notes?: string | null;
+          admin_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      order_tracking: {
+        Row: {
+          id: string;
+          order_id: string;
+          status: string;
+          title: string;
+          description: string | null;
+          location: string | null;
+          completed_at: string;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          status: string;
+          title: string;
+          description?: string | null;
+          location?: string | null;
+          completed_at?: string;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          status?: string;
+          title?: string;
+          description?: string | null;
+          location?: string | null;
+          completed_at?: string;
+        };
+        Relationships: [];
+      };
+      favorites: {
+        Row: {
+          id: string;
+          user_id: string;
+          vehicle_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          vehicle_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          vehicle_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      quotes: {
+        Row: {
+          id: string;
+          quote_number: string;
+          user_id: string;
+          vehicle_id: string;
+          vehicle_make: string;
+          vehicle_model: string;
+          vehicle_year: number;
+          vehicle_price_usd: number;
+          vehicle_source: string;
+          destination_name: string;
+          destination_country: string;
+          shipping_type: string;
+          shipping_cost_xaf: number;
+          insurance_cost_xaf: number;
+          inspection_fee_xaf: number;
+          total_cost_xaf: number;
+          status: string;
+          valid_until: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_number: string;
+          user_id: string;
+          vehicle_id: string;
+          vehicle_make: string;
+          vehicle_model: string;
+          vehicle_year: number;
+          vehicle_price_usd: number;
+          vehicle_source: string;
+          destination_name: string;
+          destination_country: string;
+          shipping_type: string;
+          shipping_cost_xaf: number;
+          insurance_cost_xaf: number;
+          inspection_fee_xaf: number;
+          total_cost_xaf: number;
+          status?: string;
+          valid_until: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          quote_number?: string;
+          user_id?: string;
+          vehicle_id?: string;
+          vehicle_make?: string;
+          vehicle_model?: string;
+          vehicle_year?: number;
+          vehicle_price_usd?: number;
+          vehicle_source?: string;
+          destination_name?: string;
+          destination_country?: string;
+          shipping_type?: string;
+          shipping_cost_xaf?: number;
+          insurance_cost_xaf?: number;
+          inspection_fee_xaf?: number;
+          total_cost_xaf?: number;
+          status?: string;
+          valid_until?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message: string | null;
+          data: Json | null;
+          read: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message?: string | null;
+          data?: Json | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          title?: string;
+          message?: string | null;
+          data?: Json | null;
+          read?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+  };
+};
+
+// Convenience types
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Vehicle = Database['public']['Tables']['vehicles']['Row'];
+export type Order = Database['public']['Tables']['orders']['Row'];
+export type OrderTracking = Database['public']['Tables']['order_tracking']['Row'];
+export type Favorite = Database['public']['Tables']['favorites']['Row'];
+export type Quote = Database['public']['Tables']['quotes']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
