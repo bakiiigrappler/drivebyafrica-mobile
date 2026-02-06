@@ -36,6 +36,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "f11c9f13-beef-4848-adce-dc72539f36bf"
+      }
+    },
+    "owner": "florentfranck"
   }
 }
