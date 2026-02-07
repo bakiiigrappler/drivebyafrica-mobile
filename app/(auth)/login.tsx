@@ -113,7 +113,7 @@ export default function LoginScreen() {
         {/* Back Button */}
         <TouchableOpacity
           style={[styles.backBtn, { top: insets.top + 10 }]}
-          onPress={() => router.back()}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
         >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
