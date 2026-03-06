@@ -203,9 +203,6 @@ export default function MessagesScreen() {
           ...(session?.access_token
             ? { Authorization: `Bearer ${session.access_token}` }
             : {}),
-          Cookie: session?.access_token
-            ? `sb-access-token=${session.access_token}; sb-refresh-token=${session.refresh_token}`
-            : '',
         },
         body: JSON.stringify({
           conversationId: currentConvId,
