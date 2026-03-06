@@ -417,7 +417,7 @@ export default function QuotesScreen() {
               </ThemedText>
               {quote.container_type === '40ft' && (
                 <View style={styles.containerBadge}>
-                  <Ionicons name="cube-outline" size={10} color="#2563EB" />
+                  <Ionicons name="cart-outline" size={10} color="#2563EB" />
                   <ThemedText style={styles.containerBadgeText}>
                     40ft ({quote.group_vehicle_count || 1} véh.)
                   </ThemedText>
@@ -519,7 +519,7 @@ export default function QuotesScreen() {
         {/* Group Header */}
         <View style={styles.groupHeader}>
           <View style={styles.containerBadgeLarge}>
-            <Ionicons name="cube" size={14} color="#2563EB" />
+            <Ionicons name="cart" size={14} color="#2563EB" />
             <ThemedText style={styles.containerBadgeLargeText}>
               Container 40ft ({groupQuotes.length} véhicules)
             </ThemedText>
