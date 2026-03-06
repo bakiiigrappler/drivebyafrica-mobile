@@ -90,7 +90,7 @@ async function fetchBatches(options: UseBatchesOptions): Promise<PaginatedBatche
       'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'count=exact',
+      'Prefer': 'count=estimated',
     },
   });
 

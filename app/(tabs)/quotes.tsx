@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors, AppTheme } from '@/constants/Colors';
 import { ThemedView } from '@/components/ui/ThemedView';
@@ -87,15 +88,52 @@ export default function QuotesScreen() {
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showValidationModal, setShowValidationModal] = useState(false);
-  const [quoteToValidate, setQuoteToValidate] = useState<Quote | null>(null);
+  const [quotesToValidate, setQuotesToValidate] = useState<Quote[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Redirect to login if not authenticated
+  // Auth prompt animations
+  const authFadeAnim = useRef(new Animated.Value(0)).current;
+  const authSlideAnim = useRef(new Animated.Value(30)).current;
+  const authScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const authPulseAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     if (isInitialized && !user) {
-      router.replace('/(auth)/login');
+      Animated.parallel([
+        Animated.timing(authFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(authSlideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(authScaleAnim, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(authPulseAnim, {
+            toValue: 1.1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(authPulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
     }
-  }, [isInitialized, user, router]);
+  }, [isInitialized, user]);
 
   // Fetch all quotes (for status counts)
   const { data: allQuotesData } = useQuotes({ status: 'all', page: 0 });
@@ -148,6 +186,43 @@ export default function QuotesScreen() {
       q.vehicle_model.toLowerCase().includes(query)
     );
   }, [quotes, searchQuery]);
+
+  // Group quotes by group_id for container 40ft display
+  type QuoteListItem = { type: 'single'; quote: Quote } | { type: 'group'; groupId: string; quotes: Quote[] };
+
+  const groupedItems = useMemo((): QuoteListItem[] => {
+    const groupMap = new Map<string, Quote[]>();
+    const singles: Quote[] = [];
+
+    filteredQuotes.forEach((q: Quote) => {
+      if (q.group_id) {
+        const existing = groupMap.get(q.group_id) || [];
+        existing.push(q);
+        groupMap.set(q.group_id, existing);
+      } else {
+        singles.push(q);
+      }
+    });
+
+    const items: QuoteListItem[] = [];
+
+    // Add groups (sorted by first quote's created_at)
+    groupMap.forEach((groupQuotes, groupId) => {
+      items.push({ type: 'group', groupId, quotes: groupQuotes });
+    });
+
+    // Add singles
+    singles.forEach(q => items.push({ type: 'single', quote: q }));
+
+    // Sort all by date (most recent first)
+    items.sort((a, b) => {
+      const dateA = a.type === 'group' ? a.quotes[0].created_at : a.quote.created_at;
+      const dateB = b.type === 'group' ? b.quotes[0].created_at : b.quote.created_at;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+
+    return items;
+  }, [filteredQuotes]);
 
   const handleStatusChange = (status: QuoteStatus | 'all') => {
     setActiveStatus(status);
@@ -206,8 +281,8 @@ export default function QuotesScreen() {
     setShowPreviewModal(true);
   };
 
-  const handleValidateQuote = (quote: Quote) => {
-    setQuoteToValidate(quote);
+  const handleValidateQuote = (quotesArr: Quote[]) => {
+    setQuotesToValidate(quotesArr);
     setShowValidationModal(true);
   };
 
@@ -335,10 +410,20 @@ export default function QuotesScreen() {
               </ThemedText>
             </View>
 
-            {/* Quote Number */}
-            <ThemedText variant="muted" size="xs" style={styles.quoteNumber}>
-              {quote.quote_number}
-            </ThemedText>
+            {/* Quote Number + Container Badge */}
+            <View style={styles.quoteNumberRow}>
+              <ThemedText variant="muted" size="xs" style={styles.quoteNumber}>
+                {quote.quote_number}
+              </ThemedText>
+              {quote.container_type === '40ft' && (
+                <View style={styles.containerBadge}>
+                  <Ionicons name="cube-outline" size={10} color="#2563EB" />
+                  <ThemedText style={styles.containerBadgeText}>
+                    40ft ({quote.group_vehicle_count || 1} véh.)
+                  </ThemedText>
+                </View>
+              )}
+            </View>
 
             {/* Vehicle Title */}
             <ThemedText variant="subtitle" numberOfLines={1} style={styles.vehicleTitle}>
@@ -376,7 +461,7 @@ export default function QuotesScreen() {
             {canValidate(quote) && (
               <TouchableOpacity
                 style={[styles.validateButton]}
-                onPress={() => handleValidateQuote(quote)}
+                onPress={() => handleValidateQuote([quote])}
               >
                 <Ionicons name="checkmark-circle" size={16} color="#fff" />
                 <ThemedText style={styles.validateButtonText}>Valider</ThemedText>
@@ -418,6 +503,145 @@ export default function QuotesScreen() {
       </TouchableOpacity>
     );
   }, [colors, deleteQuoteMutation.isPending]);
+
+  const renderGroupedQuoteCard = useCallback(({ quotes: groupQuotes }: { quotes: Quote[] }) => {
+    const firstQuote = groupQuotes[0];
+    const status = STATUS_CONFIG[firstQuote.status] || STATUS_CONFIG.pending;
+    const expired = isExpired(firstQuote.valid_until) && firstQuote.status === 'pending';
+    const totalXAF = groupQuotes.reduce((sum, q) => sum + q.total_cost_xaf, 0);
+    const allCanValidate = groupQuotes.every(q => canValidate(q));
+    const canDelete = groupQuotes.every(q => q.status !== 'accepted');
+
+    return (
+      <View
+        style={[styles.quoteCard, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}
+      >
+        {/* Group Header */}
+        <View style={styles.groupHeader}>
+          <View style={styles.containerBadgeLarge}>
+            <Ionicons name="cube" size={14} color="#2563EB" />
+            <ThemedText style={styles.containerBadgeLargeText}>
+              Container 40ft ({groupQuotes.length} véhicules)
+            </ThemedText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: expired ? STATUS_CONFIG.expired.bg : status.bg }]}>
+            <Ionicons
+              name={expired ? STATUS_CONFIG.expired.icon : status.icon}
+              size={12}
+              color={expired ? STATUS_CONFIG.expired.color : status.color}
+            />
+            <ThemedText style={[styles.statusText, { color: expired ? STATUS_CONFIG.expired.color : status.color }]}>
+              {expired ? 'Expiré' : status.label}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Vehicles List */}
+        {groupQuotes.map((q, i) => {
+          const vehicleImage = q.vehicles ? getFirstValidImage(q.vehicles.images) : PLACEHOLDER_IMAGE;
+          return (
+            <TouchableOpacity
+              key={q.id}
+              style={[
+                styles.groupVehicleRow,
+                i < groupQuotes.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.cardBorder },
+              ]}
+              onPress={() => handleViewVehicle(q.vehicle_id)}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={{ uri: vehicleImage }}
+                style={styles.groupVehicleImage}
+                contentFit="cover"
+                placeholder={{ uri: PLACEHOLDER_IMAGE }}
+              />
+              <View style={{ flex: 1 }}>
+                <ThemedText variant="subtitle" size="sm" numberOfLines={1}>
+                  {q.vehicle_make} {q.vehicle_model} ({q.vehicle_year})
+                </ThemedText>
+                <ThemedText variant="muted" size="xs">N° {q.quote_number}</ThemedText>
+              </View>
+              <ThemedText style={{ color: AppTheme.orange, fontWeight: '700', fontSize: 13 }}>
+                {formatCurrency(q.total_cost_xaf)}
+              </ThemedText>
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Destination */}
+        <View style={[styles.destinationRow, { marginTop: 8 }]}>
+          <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+          <ThemedText variant="muted" size="xs">
+            {firstQuote.destination_name}, {firstQuote.destination_country}
+          </ThemedText>
+          <ThemedText variant="muted" size="xs"> • {SOURCE_FLAGS[firstQuote.vehicle_source]} {SOURCE_NAMES[firstQuote.vehicle_source]}</ThemedText>
+        </View>
+
+        {/* Bottom Row: Total + Actions */}
+        <View style={styles.cardBottomRow}>
+          <View>
+            <ThemedText style={styles.price}>
+              {formatCurrency(totalXAF)}
+            </ThemedText>
+            <ThemedText variant="muted" size="xs">
+              Total • Créé le {formatDate(firstQuote.created_at)}
+            </ThemedText>
+          </View>
+
+          <View style={styles.cardActions}>
+            {allCanValidate && (
+              <TouchableOpacity
+                style={[styles.validateButton]}
+                onPress={() => handleValidateQuote(groupQuotes)}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                <ThemedText style={styles.validateButtonText}>Valider</ThemedText>
+              </TouchableOpacity>
+            )}
+
+            {canDelete && (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}
+                onPress={() => {
+                  Alert.alert(
+                    'Supprimer le groupe',
+                    `Supprimer les ${groupQuotes.length} devis de ce container ?`,
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            for (const q of groupQuotes) {
+                              await deleteQuoteMutation.mutateAsync(q.id);
+                            }
+                            showSnackbar({ message: 'Groupe de devis supprimé', type: 'success' });
+                          } catch {
+                            showSnackbar({ message: 'Erreur lors de la suppression', type: 'error' });
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+                disabled={deleteQuoteMutation.isPending}
+              >
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  }, [colors, deleteQuoteMutation.isPending]);
+
+  const renderListItem = useCallback(({ item }: { item: QuoteListItem }) => {
+    if (item.type === 'group') {
+      return renderGroupedQuoteCard({ quotes: item.quotes });
+    }
+    return renderQuoteCard({ item: item.quote });
+  }, [renderQuoteCard, renderGroupedQuoteCard]);
 
   const ListHeader = () => (
     <View style={styles.listHeader}>
@@ -555,10 +779,108 @@ export default function QuotesScreen() {
   };
 
   // Show loading if not initialized
-  if (!isInitialized || !user) {
+  if (!isInitialized) {
     return (
       <ThemedView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={AppTheme.orange} />
+      </ThemedView>
+    );
+  }
+
+  // Show auth prompt if not logged in
+  if (!user) {
+    return (
+      <ThemedView style={styles.container}>
+        {/* Header - Dark */}
+        <View style={[styles.headerBar, { paddingTop: insets.top + 8, backgroundColor: '#000' }]}>
+          <ThemedText variant="title" size="lg" style={{ color: '#FFF' }}>{t('quotes.title', language)}</ThemedText>
+        </View>
+        <View style={styles.authPrompt}>
+          <LinearGradient
+            colors={[AppTheme.orange + '10', 'transparent']}
+            style={styles.authGradient}
+          />
+          <Animated.View
+            style={[
+              styles.authIconContainer,
+              {
+                backgroundColor: AppTheme.orange + '15',
+                transform: [{ scale: authPulseAnim }],
+              }
+            ]}
+          >
+            <LinearGradient
+              colors={[AppTheme.orange, '#FF8C42']}
+              style={styles.authIconGradient}
+            >
+              <Ionicons name="document-text" size={48} color={AppTheme.white} />
+            </LinearGradient>
+          </Animated.View>
+
+          <Animated.View
+            style={{
+              opacity: authFadeAnim,
+              transform: [{ translateY: authSlideAnim }, { scale: authScaleAnim }],
+              alignItems: 'center',
+            }}
+          >
+            <ThemedText variant="title" size="xl" style={styles.authTitle}>
+              {t('quotes.title', language)}
+            </ThemedText>
+            <ThemedText variant="muted" style={styles.authSubtitle}>
+              Connectez-vous pour consulter et gérer vos devis d'importation.
+            </ThemedText>
+
+            <View style={styles.authFeaturesRow}>
+              <View style={styles.authFeatureItem}>
+                <View style={[styles.authFeatureIcon, { backgroundColor: '#F97316' + '20' }]}>
+                  <Ionicons name="document-text" size={20} color="#F97316" />
+                </View>
+                <ThemedText size="xs" variant="muted">Devis</ThemedText>
+              </View>
+              <View style={styles.authFeatureItem}>
+                <View style={[styles.authFeatureIcon, { backgroundColor: '#3B82F6' + '20' }]}>
+                  <Ionicons name="calculator" size={20} color="#3B82F6" />
+                </View>
+                <ThemedText size="xs" variant="muted">Estimation</ThemedText>
+              </View>
+              <View style={styles.authFeatureItem}>
+                <View style={[styles.authFeatureIcon, { backgroundColor: '#22C55E' + '20' }]}>
+                  <Ionicons name="share-social" size={20} color="#22C55E" />
+                </View>
+                <ThemedText size="xs" variant="muted">Partager</ThemedText>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.authSignInButton}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={[AppTheme.orange, '#FF8C42']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.authSignInGradient}
+              >
+                <Ionicons name="log-in-outline" size={20} color={AppTheme.white} />
+                <ThemedText style={styles.authSignInText}>{t('profile.signIn', language)}</ThemedText>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.authCreateAccountLink}
+              onPress={() => router.push('/(auth)/register')}
+            >
+              <ThemedText variant="muted" size="sm">
+                {t('auth.noAccount', language)}{' '}
+                <ThemedText size="sm" style={{ color: AppTheme.orange, fontWeight: '600' }}>
+                  {t('profile.createAccount', language)}
+                </ThemedText>
+              </ThemedText>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
       </ThemedView>
     );
   }
@@ -634,9 +956,9 @@ export default function QuotesScreen() {
 
           <FlatList
             ref={flatListRef}
-            data={filteredQuotes}
-            renderItem={renderQuoteCard}
-            keyExtractor={(item) => item.id}
+            data={groupedItems}
+            renderItem={renderListItem}
+            keyExtractor={(item) => item.type === 'group' ? `group-${item.groupId}` : item.quote.id}
             ListHeaderComponent={ListHeader}
             ListFooterComponent={ListFooter}
             ListEmptyComponent={ListEmpty}
@@ -679,9 +1001,9 @@ export default function QuotesScreen() {
         visible={showValidationModal}
         onClose={() => {
           setShowValidationModal(false);
-          setQuoteToValidate(null);
+          setQuotesToValidate([]);
         }}
-        quote={quoteToValidate}
+        quotes={quotesToValidate}
       />
     </ThemedView>
   );
@@ -795,9 +1117,60 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  quoteNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
   quoteNumber: {
     fontFamily: 'monospace',
-    marginBottom: 4,
+  },
+  containerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 3,
+  },
+  containerBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  // Grouped card
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  containerBadgeLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    gap: 6,
+  },
+  containerBadgeLargeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  groupVehicleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    gap: 10,
+  },
+  groupVehicleImage: {
+    width: 56,
+    height: 40,
+    borderRadius: 6,
   },
   vehicleTitle: {
     fontWeight: '700',
@@ -990,6 +1363,89 @@ const styles = StyleSheet.create({
     color: AppTheme.white,
     fontWeight: '700',
     fontSize: 16,
+  },
+  // Auth prompt
+  authPrompt: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    position: 'relative',
+  },
+  authGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+  },
+  authIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  authIconGradient: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authTitle: {
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  authSubtitle: {
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  authFeaturesRow: {
+    flexDirection: 'row',
+    marginTop: 28,
+    gap: 24,
+  },
+  authFeatureItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  authFeatureIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authSignInButton: {
+    marginTop: 32,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  authSignInGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    gap: 10,
+  },
+  authSignInText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  authCreateAccountLink: {
+    marginTop: 20,
+    padding: 8,
   },
   // Info card
   infoCard: {

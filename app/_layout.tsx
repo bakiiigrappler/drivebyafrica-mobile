@@ -7,7 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Colors } from '@/constants/Colors';
-import { useAuthStore, useOnboardingStore, useSettingsStore } from '@/store';
+import { useAuthStore, useOnboardingStore, useSettingsStore, useCartStore } from '@/store';
 import { SplashScreen } from '@/components/SplashScreen';
 import { SnackbarProvider } from '@/contexts/SnackbarContext';
 
@@ -31,6 +31,7 @@ function RootLayoutNav() {
   const { initialize, isInitialized } = useAuthStore();
   const { hasSeenOnboarding, isLoading: onboardingLoading, checkOnboardingStatus } = useOnboardingStore();
   const settingsStore = useSettingsStore();
+  const cartStore = useCartStore();
   const [showSplash, setShowSplash] = useState(true);
   const [isReady, setIsReady] = useState(false);
 
@@ -38,6 +39,7 @@ function RootLayoutNav() {
     initialize();
     checkOnboardingStatus();
     settingsStore.initialize();
+    cartStore.initialize();
   }, []);
 
   useEffect(() => {
@@ -154,6 +156,21 @@ function RootLayoutNav() {
           name="favorites"
           options={{
             title: 'Favoris',
+            headerStyle: {
+              backgroundColor: '#000',
+            },
+            headerTintColor: '#FFF',
+            headerTitleStyle: {
+              fontWeight: '700',
+              fontSize: 18,
+            },
+            headerBackTitle: 'Retour',
+          }}
+        />
+        <Stack.Screen
+          name="cart"
+          options={{
+            title: 'Container 40 pieds',
             headerStyle: {
               backgroundColor: '#000',
             },

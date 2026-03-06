@@ -11,7 +11,8 @@ import { ThemedText } from '@/components/ui/ThemedText';
 import { Button } from '@/components/ui/Button';
 import { QuoteEstimationModal } from '@/components/vehicles/QuoteEstimationModal';
 import { useVehicle, useFavorites, useCurrency } from '@/hooks';
-import { useAuthStore, useSettingsStore } from '@/store';
+import { useAuthStore, useSettingsStore, useCartStore } from '@/store';
+import { showGlobalSnackbar } from '@/contexts/SnackbarContext';
 import { t, type Language } from '@/lib/i18n';
 import { getExportTax } from '@/lib/pricing';
 import { parseImagesField, getFirstValidImage, PLACEHOLDER_IMAGE } from '@/lib/images';
@@ -52,6 +53,11 @@ export default function VehicleDetailScreen() {
   const [activeTab, setActiveTab] = useState<DetailTab>('documents');
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const imageScrollRef = useRef<ScrollView>(null);
+
+  // Cart hooks must be before any conditional returns
+  const cartItems = useCartStore((s) => s.items);
+  const addToCart = useCartStore((s) => s.addItem);
+  const canAddToCart = useCartStore((s) => s.canAdd);
 
   if (isLoading) {
     return (
@@ -94,6 +100,32 @@ export default function VehicleDetailScreen() {
   const statusStyle = STATUS_STYLES[vehicleStatus] || STATUS_STYLES.available;
   const isReserved = vehicleStatus === 'reserved';
   const isSold = vehicleStatus === 'sold';
+  const isAvailable = vehicleStatus === 'available';
+
+  // Cart
+  const isInCart = cartItems.some((i) => i.vehicleId === vehicle.id);
+  const source = (vehicle.source || 'korea') as 'korea' | 'china' | 'dubai';
+
+  const handleAddToCart = () => {
+    if (isInCart) {
+      router.push('/cart');
+      return;
+    }
+    const result = addToCart({
+      vehicleId: vehicle.id,
+      vehicleSource: source,
+      vehicleMake: vehicle.make || 'Unknown',
+      vehicleModel: vehicle.model || 'Unknown',
+      vehicleYear: vehicle.year || new Date().getFullYear(),
+      vehiclePriceUSD: effectivePriceUsd,
+      imageUrl: allImages[0] !== PLACEHOLDER_IMAGE ? allImages[0] : null,
+    });
+    if (result.success) {
+      showGlobalSnackbar({ message: t('cart.vehicleAdded', language), type: 'success' });
+    } else if (result.error) {
+      showGlobalSnackbar({ message: t(result.error, language), type: 'error' });
+    }
+  };
 
   // Share function like in web version
   const handleShare = async () => {
@@ -569,6 +601,24 @@ export default function VehicleDetailScreen() {
               {isSold ? t('vehicleDetail.soldButton', language) : isReserved ? t('vehicleDetail.reservedButton', language) : t('vehicleDetail.estimateFees', language)}
             </ThemedText>
           </TouchableOpacity>
+          {isAvailable && hasPrice && (
+            <TouchableOpacity
+              style={[
+                styles.cartBtn,
+                {
+                  backgroundColor: isInCart ? '#22C55E' : AppTheme.orange + '15',
+                  borderColor: isInCart ? '#22C55E' : AppTheme.orange,
+                },
+              ]}
+              onPress={handleAddToCart}
+            >
+              <Ionicons
+                name={isInCart ? 'checkmark-circle' : 'cube-outline'}
+                size={18}
+                color={isInCart ? '#fff' : AppTheme.orange}
+              />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.questionBtn, { borderColor: AppTheme.orange }]}
             onPress={handleAskQuestion}
@@ -912,6 +962,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '700',
+  },
+  cartBtn: {
+    width: 52,
+    borderWidth: 2,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   questionBtn: {
     width: 52,

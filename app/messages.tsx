@@ -59,6 +59,40 @@ function getQuickQuestions(lang: string) {
   return QUICK_QUESTIONS_FR;
 }
 
+function generateLocalFallback(userMessage: string, lang: string): string {
+  const msg = userMessage.toLowerCase();
+
+  if (msg.includes('devis') || msg.includes('quote')) {
+    return lang === 'en'
+      ? "To get a quote, select a vehicle from our catalog and click 'Request a quote'. You'll receive a detailed estimate including vehicle price, transport and insurance."
+      : "Pour obtenir un devis, sélectionnez un véhicule dans notre catalogue et cliquez sur 'Demander un devis'. Vous recevrez une estimation détaillée incluant le prix du véhicule, le transport et l'assurance.";
+  }
+  if (msg.includes('delai') || msg.includes('livraison') || msg.includes('delivery') || msg.includes('time')) {
+    return lang === 'en'
+      ? "Delivery times depend on the vehicle's origin:\n- South Korea: 4-6 weeks\n- China: 6-8 weeks\n- Dubai: 3-5 weeks"
+      : "Les délais de livraison dépendent de l'origine du véhicule:\n- Corée du Sud: 4-6 semaines\n- Chine: 6-8 semaines\n- Dubaï: 3-5 semaines";
+  }
+  if (msg.includes('paiement') || msg.includes('payer') || msg.includes('payment')) {
+    return lang === 'en'
+      ? "We accept:\n- Bank card (Visa, Mastercard)\n- Mobile Money (Airtel, MTN, Orange)\n- Cash at our office\n\nThe deposit is $1,000 USD per vehicle."
+      : "Nous acceptons:\n- Carte bancaire (Visa, Mastercard)\n- Mobile Money (Airtel, MTN, Orange)\n- Cash en agence\n\nL'acompte est de 1 000 USD par véhicule.";
+  }
+  if (msg.includes('inspection') || msg.includes('rapport') || msg.includes('report')) {
+    return lang === 'en'
+      ? "After paying the deposit, our experts perform a detailed inspection including HD photos, mechanical check, vehicle history and body condition. You receive this report before paying the balance."
+      : "Après le paiement de l'acompte, nos experts effectuent une inspection détaillée: photos HD, vérification mécanique, historique du véhicule et état de la carrosserie. Vous recevez ce rapport avant de payer le solde.";
+  }
+  if (msg.includes('bonjour') || msg.includes('salut') || msg.includes('hello') || msg.includes('hi')) {
+    return lang === 'en'
+      ? "Hello! Welcome to Driveby Africa. I can help you find a vehicle from Korea, China or Dubai.\n\nWhat brand or type of vehicle are you looking for?"
+      : "Bonjour! Bienvenue sur Driveby Africa. Je peux vous aider à trouver un véhicule depuis la Corée, la Chine ou Dubaï.\n\nQuelle marque ou quel type de véhicule recherchez-vous?";
+  }
+
+  return lang === 'en'
+    ? "I can help you with:\n- Searching for a vehicle (brand, budget, year)\n- Getting a personalized quote\n- Tracking your current order\n- Understanding our purchase process\n\nWhat brand or vehicle type interests you?"
+    : "Je peux vous aider avec:\n- Rechercher un véhicule (marque, budget, année)\n- Obtenir un devis personnalisé\n- Suivre votre commande en cours\n- Comprendre notre processus d'achat\n\nQuelle marque ou quel type de véhicule vous intéresse?";
+}
+
 export default function MessagesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -99,25 +133,25 @@ export default function MessagesScreen() {
     try {
       // Find existing conversation
       const { data: conversations } = await supabase
-        .from('chat_conversations')
+        .from('chat_conversations' as any)
         .select('id, status')
         .eq('user_id', user!.id)
         .order('last_message_at', { ascending: false })
         .limit(1);
 
       if (conversations && conversations.length > 0) {
-        const conv = conversations[0];
+        const conv = conversations[0] as any;
         setConversationId(conv.id);
 
         // Load messages
         const { data: msgs } = await supabase
-          .from('chat_messages')
+          .from('chat_messages' as any)
           .select('*')
           .eq('conversation_id', conv.id)
           .order('created_at', { ascending: true });
 
         if (msgs) {
-          setMessages(msgs as Message[]);
+          setMessages(msgs as unknown as Message[]);
         }
       }
     } catch (error) {
@@ -150,17 +184,17 @@ export default function MessagesScreen() {
       // Create conversation if needed
       if (!currentConvId) {
         const { data: newConv, error: convError } = await supabase
-          .from('chat_conversations')
+          .from('chat_conversations' as any)
           .insert({ user_id: user.id, status: 'active' })
           .select()
           .single();
 
         if (convError) throw convError;
-        currentConvId = newConv.id;
+        currentConvId = (newConv as any).id;
         setConversationId(currentConvId);
 
         // Add welcome message from bot
-        await supabase.from('chat_messages').insert({
+        await supabase.from('chat_messages' as any).insert({
           conversation_id: currentConvId,
           sender_type: 'bot',
           content: language === 'en'
@@ -174,7 +208,7 @@ export default function MessagesScreen() {
 
       // Insert user message
       const { data: savedMsg, error: msgError } = await supabase
-        .from('chat_messages')
+        .from('chat_messages' as any)
         .insert({
           conversation_id: currentConvId,
           user_id: user.id,
@@ -188,7 +222,7 @@ export default function MessagesScreen() {
 
       // Replace temp message
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? (savedMsg as Message) : m))
+        prev.map((m) => (m.id === tempId ? (savedMsg as unknown as Message) : m))
       );
 
       // Show typing indicator
@@ -196,57 +230,66 @@ export default function MessagesScreen() {
 
       // Get AI response via web API
       const { data: { session } } = await supabase.auth.getSession();
-      const aiResponse = await fetch(`${API_URL}/api/chat/ai`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token
-            ? { Authorization: `Bearer ${session.access_token}` }
-            : {}),
-        },
-        body: JSON.stringify({
-          conversationId: currentConvId,
-          userMessage: content,
-          currency: currency,
-          exchangeRate: currencyInfo?.rateToUsd || 1,
-        }),
-      });
+      let aiBotMessage: Message | null = null;
+      try {
+        const aiResponse = await fetch(`${API_URL}/api/chat/ai`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(session?.access_token
+              ? { Authorization: `Bearer ${session.access_token}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            conversationId: currentConvId,
+            userMessage: content,
+            currency: currency,
+            exchangeRate: currencyInfo?.rateToUsd || 1,
+          }),
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          if (aiData.message) {
+            aiBotMessage = aiData.message as Message;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('AI API unreachable, using fallback:', fetchErr);
+      }
 
       setIsTyping(false);
 
-      if (aiResponse.ok) {
-        const aiData = await aiResponse.json();
-        if (aiData.message) {
-          setMessages((prev) => [...prev, aiData.message as Message]);
-        }
+      if (aiBotMessage) {
+        setMessages((prev) => [...prev, aiBotMessage!]);
       } else {
-        // Fallback: fetch messages from DB (AI might have saved response server-side)
-        const { data: refreshed } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('conversation_id', currentConvId)
-          .order('created_at', { ascending: true });
+        // Generate local fallback response and save to DB
+        const fallbackContent = generateLocalFallback(content, language);
+        const { data: botMsg } = await supabase
+          .from('chat_messages' as any)
+          .insert({
+            conversation_id: currentConvId,
+            sender_type: 'bot',
+            content: fallbackContent,
+            metadata: { type: 'fallback' },
+          })
+          .select()
+          .single();
 
-        if (refreshed) {
-          setMessages(refreshed as Message[]);
+        if (botMsg) {
+          setMessages((prev) => [...prev, botMsg as unknown as Message]);
         } else {
-          // Add local fallback message
-          const fallback: Message = {
+          setMessages((prev) => [...prev, {
             id: `fallback-${Date.now()}`,
             conversation_id: currentConvId!,
             sender_type: 'bot',
-            content: language === 'en'
-              ? "I'm having trouble right now. Please try again or contact us via WhatsApp."
-              : language === 'zh'
-              ? '我现在遇到了问题。请重试或通过 WhatsApp 联系我们。'
-              : "Je rencontre des difficultés. Réessayez ou contactez-nous via WhatsApp.",
+            content: fallbackContent,
             created_at: new Date().toISOString(),
-          };
-          setMessages((prev) => [...prev, fallback]);
+          }]);
         }
       }
-    } catch (error) {
-      console.error('Send message error:', error);
+    } catch (error: any) {
+      console.error('Send message error:', error?.message || error);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setInputMessage(content);
       showGlobalSnackbar({

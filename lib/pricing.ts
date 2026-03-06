@@ -17,6 +17,10 @@ export const EXPORT_TAX_USD: Record<string, number> = {
   dubai: 0,
 };
 
+// Deposit amounts
+export const DEPOSIT_PER_VEHICLE_USD = 1000;
+export const DEPOSIT_PER_VEHICLE_XAF = 600000;
+
 // Shipping type multipliers
 export const SHIPPING_MULTIPLIERS = {
   container: 1,    // Full container
@@ -34,24 +38,29 @@ export interface ShippingDestination {
     china: number;
     dubai: number;
   };
+  shippingCost40ft: {
+    korea: number;
+    china: number;
+    dubai: number;
+  };
 }
 
 // Default shipping destinations (fallback if API fails)
 export const DEFAULT_DESTINATIONS: ShippingDestination[] = [
-  { id: 'dakar', name: 'Dakar', country: 'Sénégal', flag: '🇸🇳', shippingCost: { korea: 4600, china: 5200, dubai: 4200 } },
-  { id: 'abidjan', name: 'Abidjan', country: 'Côte d\'Ivoire', flag: '🇨🇮', shippingCost: { korea: 4500, china: 5000, dubai: 4100 } },
-  { id: 'lagos', name: 'Lagos', country: 'Nigeria', flag: '🇳🇬', shippingCost: { korea: 4400, china: 4900, dubai: 4000 } },
-  { id: 'douala', name: 'Douala', country: 'Cameroun', flag: '🇨🇲', shippingCost: { korea: 4300, china: 4800, dubai: 3900 } },
-  { id: 'libreville', name: 'Libreville', country: 'Gabon', flag: '🇬🇦', shippingCost: { korea: 4400, china: 4900, dubai: 4000 } },
-  { id: 'pointe-noire', name: 'Pointe-Noire', country: 'Congo', flag: '🇨🇬', shippingCost: { korea: 4500, china: 5000, dubai: 4100 } },
-  { id: 'mombasa', name: 'Mombasa', country: 'Kenya', flag: '🇰🇪', shippingCost: { korea: 3800, china: 4300, dubai: 3200 } },
-  { id: 'dar-es-salaam', name: 'Dar es Salaam', country: 'Tanzanie', flag: '🇹🇿', shippingCost: { korea: 3900, china: 4400, dubai: 3300 } },
-  { id: 'durban', name: 'Durban', country: 'Afrique du Sud', flag: '🇿🇦', shippingCost: { korea: 4200, china: 4700, dubai: 3600 } },
-  { id: 'tema', name: 'Tema', country: 'Ghana', flag: '🇬🇭', shippingCost: { korea: 4500, china: 5000, dubai: 4100 } },
-  { id: 'cotonou', name: 'Cotonou', country: 'Bénin', flag: '🇧🇯', shippingCost: { korea: 4400, china: 4900, dubai: 4000 } },
-  { id: 'lome', name: 'Lomé', country: 'Togo', flag: '🇹🇬', shippingCost: { korea: 4450, china: 4950, dubai: 4050 } },
-  { id: 'conakry', name: 'Conakry', country: 'Guinée', flag: '🇬🇳', shippingCost: { korea: 4700, china: 5200, dubai: 4300 } },
-  { id: 'banjul', name: 'Banjul', country: 'Gambie', flag: '🇬🇲', shippingCost: { korea: 4650, china: 5150, dubai: 4250 } },
+  { id: 'dakar', name: 'Dakar', country: 'Sénégal', flag: '🇸🇳', shippingCost: { korea: 4600, china: 5200, dubai: 4200 }, shippingCost40ft: { korea: 7400, china: 8300, dubai: 6700 } },
+  { id: 'abidjan', name: 'Abidjan', country: 'Côte d\'Ivoire', flag: '🇨🇮', shippingCost: { korea: 4500, china: 5000, dubai: 4100 }, shippingCost40ft: { korea: 7200, china: 8000, dubai: 6600 } },
+  { id: 'lagos', name: 'Lagos', country: 'Nigeria', flag: '🇳🇬', shippingCost: { korea: 4400, china: 4900, dubai: 4000 }, shippingCost40ft: { korea: 7000, china: 7800, dubai: 6400 } },
+  { id: 'douala', name: 'Douala', country: 'Cameroun', flag: '🇨🇲', shippingCost: { korea: 4300, china: 4800, dubai: 3900 }, shippingCost40ft: { korea: 6900, china: 7700, dubai: 6200 } },
+  { id: 'libreville', name: 'Libreville', country: 'Gabon', flag: '🇬🇦', shippingCost: { korea: 4400, china: 4900, dubai: 4000 }, shippingCost40ft: { korea: 7000, china: 7800, dubai: 6400 } },
+  { id: 'pointe-noire', name: 'Pointe-Noire', country: 'Congo', flag: '🇨🇬', shippingCost: { korea: 4500, china: 5000, dubai: 4100 }, shippingCost40ft: { korea: 7200, china: 8000, dubai: 6600 } },
+  { id: 'mombasa', name: 'Mombasa', country: 'Kenya', flag: '🇰🇪', shippingCost: { korea: 3800, china: 4300, dubai: 3200 }, shippingCost40ft: { korea: 6100, china: 6900, dubai: 5100 } },
+  { id: 'dar-es-salaam', name: 'Dar es Salaam', country: 'Tanzanie', flag: '🇹🇿', shippingCost: { korea: 3900, china: 4400, dubai: 3300 }, shippingCost40ft: { korea: 6200, china: 7000, dubai: 5300 } },
+  { id: 'durban', name: 'Durban', country: 'Afrique du Sud', flag: '🇿🇦', shippingCost: { korea: 4200, china: 4700, dubai: 3600 }, shippingCost40ft: { korea: 6700, china: 7500, dubai: 5800 } },
+  { id: 'tema', name: 'Tema', country: 'Ghana', flag: '🇬🇭', shippingCost: { korea: 4500, china: 5000, dubai: 4100 }, shippingCost40ft: { korea: 7200, china: 8000, dubai: 6600 } },
+  { id: 'cotonou', name: 'Cotonou', country: 'Bénin', flag: '🇧🇯', shippingCost: { korea: 4400, china: 4900, dubai: 4000 }, shippingCost40ft: { korea: 7000, china: 7800, dubai: 6400 } },
+  { id: 'lome', name: 'Lomé', country: 'Togo', flag: '🇹🇬', shippingCost: { korea: 4450, china: 4950, dubai: 4050 }, shippingCost40ft: { korea: 7100, china: 7900, dubai: 6500 } },
+  { id: 'conakry', name: 'Conakry', country: 'Guinée', flag: '🇬🇳', shippingCost: { korea: 4700, china: 5200, dubai: 4300 }, shippingCost40ft: { korea: 7500, china: 8300, dubai: 6900 } },
+  { id: 'banjul', name: 'Banjul', country: 'Gambie', flag: '🇬🇲', shippingCost: { korea: 4650, china: 5150, dubai: 4250 }, shippingCost40ft: { korea: 7400, china: 8200, dubai: 6800 } },
 ];
 
 /**
@@ -154,4 +163,67 @@ export function generateQuoteNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `DBA-${timestamp}-${random}`;
+}
+
+/**
+ * Calculate import costs for multiple vehicles sharing a 40ft container.
+ * Vehicle prices are expected to include export tax (FOB).
+ */
+export interface MultiVehicleCostResult {
+  vehicleCount: number;
+  vehiclesTotalUSD: number;
+  vehiclesTotalXAF: number;
+  shippingCost40ftUSD: number;
+  shippingCost40ftXAF: number;
+  insuranceCostXAF: number;
+  inspectionFeeTotalXAF: number;
+  depositTotalUSD: number;
+  depositTotalXAF: number;
+  totalXAF: number;
+  totalUSD: number;
+  perVehicle: Array<{
+    vehiclePriceUSD: number;
+    vehiclePriceXAF: number;
+    inspectionFeeXAF: number;
+  }>;
+}
+
+export function calculateMultiVehicleImportCosts(params: {
+  vehicles: Array<{ vehiclePriceUSD: number }>;
+  shippingCost40ftUSD: number;
+  xafRate?: number;
+}): MultiVehicleCostResult {
+  const { vehicles, shippingCost40ftUSD, xafRate = XAF_RATE } = params;
+  const count = vehicles.length;
+
+  const perVehicle = vehicles.map((v) => ({
+    vehiclePriceUSD: v.vehiclePriceUSD,
+    vehiclePriceXAF: Math.round(v.vehiclePriceUSD * xafRate),
+    inspectionFeeXAF: INSPECTION_FEE_XAF,
+  }));
+
+  const vehiclesTotalUSD = vehicles.reduce((s, v) => s + v.vehiclePriceUSD, 0);
+  const vehiclesTotalXAF = Math.round(vehiclesTotalUSD * xafRate);
+  const shippingCost40ftXAF = Math.round(shippingCost40ftUSD * xafRate);
+  const inspectionFeeTotalXAF = INSPECTION_FEE_XAF * count;
+
+  // Insurance: 2.5% of (vehicles FOB + shipping)
+  const insuranceCostXAF = Math.round((vehiclesTotalXAF + shippingCost40ftXAF) * INSURANCE_RATE);
+
+  const totalXAF = vehiclesTotalXAF + shippingCost40ftXAF + insuranceCostXAF + inspectionFeeTotalXAF;
+
+  return {
+    vehicleCount: count,
+    vehiclesTotalUSD,
+    vehiclesTotalXAF,
+    shippingCost40ftUSD,
+    shippingCost40ftXAF,
+    insuranceCostXAF,
+    inspectionFeeTotalXAF,
+    depositTotalUSD: DEPOSIT_PER_VEHICLE_USD * count,
+    depositTotalXAF: DEPOSIT_PER_VEHICLE_XAF * count,
+    totalXAF,
+    totalUSD: Math.round(totalXAF / xafRate),
+    perVehicle,
+  };
 }

@@ -95,7 +95,7 @@ const criteriaStyles = StyleSheet.create({
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signUp, isLoading } = useAuthStore();
+  const { signUp, signInWithGoogle, isLoading } = useAuthStore();
 
   const [currentStep, setCurrentStep] = useState(0);
   const [fullName, setFullName] = useState('');
@@ -711,6 +711,34 @@ export default function RegisterScreen() {
           </LinearGradient>
         </TouchableOpacity>
 
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <ThemedText style={styles.dividerText}>ou</ThemedText>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Google OAuth */}
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={async () => {
+            const { error } = await signInWithGoogle();
+            if (error) {
+              showGlobalSnackbar({
+                message: 'La connexion Google a échoué',
+                type: 'error',
+                icon: 'alert-circle',
+                duration: 4000,
+              });
+            }
+          }}
+          disabled={isLoading}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="logo-google" size={20} color="#DB4437" />
+          <ThemedText style={styles.googleButtonText}>Continuer avec Google</ThemedText>
+        </TouchableOpacity>
+
         {/* Login Link */}
         <View style={styles.loginLink}>
           <ThemedText style={styles.loginText}>Déjà un compte ? </ThemedText>
@@ -946,6 +974,37 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#ffffff',
+  },
+  googleButtonText: {
+    color: '#333',
+    fontWeight: '600',
+    fontSize: 15,
   },
   loginLink: {
     flexDirection: 'row',

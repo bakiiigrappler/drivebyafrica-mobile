@@ -22,6 +22,31 @@ export const vehicleKeys = {
 };
 
 /**
+ * Check if filters have active constraints (matches web implementation)
+ */
+function hasActiveFilters(filters: VehicleFilters | undefined): boolean {
+  if (!filters) return false;
+  return !!(
+    (filters.source && filters.source !== 'all') ||
+    (filters.makes && filters.makes.length > 0) ||
+    (filters.models && filters.models.length > 0) ||
+    filters.yearFrom ||
+    filters.yearTo ||
+    filters.priceFrom ||
+    filters.priceTo ||
+    filters.mileageMax ||
+    filters.transmission ||
+    filters.fuelType ||
+    filters.driveType ||
+    filters.color ||
+    filters.bodyType ||
+    filters.status ||
+    filters.newArrivals ||
+    (filters.search && filters.search.trim().length >= 3)
+  );
+}
+
+/**
  * Build PostgREST query string from filters (matches web implementation)
  */
 function buildQueryString(
@@ -78,6 +103,28 @@ function buildQueryString(
     params.append('fuel_type', `eq.${filters.fuelType}`);
   }
 
+  if (filters?.driveType) {
+    params.append('drive_type', `eq.${filters.driveType}`);
+  }
+
+  if (filters?.color) {
+    params.append('color', `ilike.*${filters.color}*`);
+  }
+
+  if (filters?.bodyType) {
+    params.append('body_type', `eq.${filters.bodyType}`);
+  }
+
+  if (filters?.status) {
+    params.append('status', `eq.${filters.status}`);
+  }
+
+  // New arrivals: vehicles added in the last 48 hours
+  if (filters?.newArrivals) {
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    params.append('created_at', `gte.${since}`);
+  }
+
   // Apply search (searches make and model)
   // Require minimum 3 characters to avoid expensive queries
   if (filters?.search && filters.search.trim().length >= 3) {
@@ -85,23 +132,29 @@ function buildQueryString(
     params.append('or', `(make.ilike.*${searchTerm}*,model.ilike.*${searchTerm}*)`);
   }
 
-  // Apply sorting - use id as secondary sort for consistency
-  let orderBy = 'id.desc';
+  // Apply sorting - use created_at as secondary sort for consistency (matches web)
+  let orderBy = 'created_at.desc';
   switch (filters?.sortBy) {
     case 'newest':
-      orderBy = 'id.desc';
+      orderBy = 'created_at.desc';
       break;
     case 'price_asc':
-      orderBy = 'start_price_usd.asc.nullslast,id.desc';
+      orderBy = 'fob_price_usd.asc.nullslast,created_at.desc';
       break;
     case 'price_desc':
-      orderBy = 'start_price_usd.desc.nullsfirst,id.desc';
+      orderBy = 'fob_price_usd.desc.nullsfirst,created_at.desc';
       break;
     case 'year_desc':
-      orderBy = 'year.desc.nullslast,id.desc';
+      orderBy = 'year.desc.nullslast,created_at.desc';
+      break;
+    case 'year_asc':
+      orderBy = 'year.asc.nullslast,created_at.desc';
       break;
     case 'mileage_asc':
-      orderBy = 'mileage.asc.nullslast,id.desc';
+      orderBy = 'mileage.asc.nullslast,created_at.desc';
+      break;
+    case 'mileage_desc':
+      orderBy = 'mileage.desc.nullsfirst,created_at.desc';
       break;
   }
   params.set('order', orderBy);
@@ -129,15 +182,28 @@ async function fetchVehicles(
   const queryString = buildQueryString(filters, page, limit);
   const url = `${SUPABASE_URL}/rest/v1/vehicles?${queryString}`;
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     method: 'GET',
     headers: {
       'apikey': SUPABASE_ANON_KEY,
       'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'count=exact',
+      'Prefer': hasActiveFilters(filters) ? 'count=exact' : 'count=estimated',
     },
   });
+
+  // If count=exact times out (500), retry with count=estimated
+  if (!response.ok && hasActiveFilters(filters)) {
+    response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'count=estimated',
+      },
+    });
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch vehicles: ${response.status}`);

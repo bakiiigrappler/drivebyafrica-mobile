@@ -31,7 +31,7 @@ export default function LoginScreen() {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signIn, isLoading } = useAuthStore();
+  const { signIn, signInWithGoogle, isLoading } = useAuthStore();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -232,18 +232,21 @@ export default function LoginScreen() {
               <View style={[styles.divider, { backgroundColor: colors.border }]} />
             </View>
 
-            {/* Social Buttons */}
-            <View style={styles.socialButtons}>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-google" size={22} color="#DB4437" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-apple" size={22} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton}>
-                <Ionicons name="logo-facebook" size={22} color="#1877F2" />
-              </TouchableOpacity>
-            </View>
+            {/* Google OAuth Button */}
+            <TouchableOpacity
+              style={styles.googleButton}
+              onPress={async () => {
+                const { error } = await signInWithGoogle();
+                if (error) {
+                  Alert.alert('Erreur', 'La connexion Google a échoué');
+                }
+              }}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <ThemedText style={styles.googleButtonText}>Continuer avec Google</ThemedText>
+            </TouchableOpacity>
 
             {/* Footer */}
             <View style={styles.footer}>
@@ -396,20 +399,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.5)',
   },
-  socialButtons: {
+  googleButton: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-  },
-  socialButton: {
-    width: 56,
-    height: 56,
+    gap: 10,
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#ffffff',
+  },
+  googleButtonText: {
+    color: '#333',
+    fontWeight: '600',
+    fontSize: 15,
   },
   footer: {
     flexDirection: 'row',

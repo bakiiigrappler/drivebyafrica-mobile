@@ -11,7 +11,7 @@ import { Colors, AppTheme } from '@/constants/Colors';
 import { ThemedView } from '@/components/ui/ThemedView';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { useVehicles, useFavorites } from '@/hooks';
-import { useAuthStore, useFilterStore, useSettingsStore } from '@/store';
+import { useAuthStore, useFilterStore, useSettingsStore, useCartStore } from '@/store';
 import { t } from '@/lib/i18n';
 import { getFirstValidImage, PLACEHOLDER_IMAGE } from '@/lib/images';
 import type { Vehicle } from '@/types';
@@ -85,6 +85,7 @@ export default function ExploreScreen() {
   const { favoriteIds, toggleFavorite } = useFavorites();
   const { language } = useSettingsStore();
   const { user } = useAuthStore();
+  const cartItemCount = useCartStore((s) => s.items.length);
   const [activeSource, setActiveSource] = useState<'all' | 'korea' | 'china' | 'dubai'>(filters.source || 'all');
   const videoPlayer = useVideoPlayer(require('@/assets/videos/hero-video.mp4'), (player) => {
     player.loop = true;
@@ -286,13 +287,29 @@ export default function ExploreScreen() {
               style={styles.logo}
               contentFit="contain"
             />
-            <AnimatedPressable
-              style={styles.notificationButton}
-              onPress={() => router.push('/notifications')}
-              scaleValue={0.9}
-            >
-              <Ionicons name="notifications-outline" size={22} color={AppTheme.white} />
-            </AnimatedPressable>
+            <View style={styles.headerRight}>
+              {/* Cart Icon */}
+              <AnimatedPressable
+                style={styles.notificationButton}
+                onPress={() => router.push('/cart')}
+                scaleValue={0.9}
+              >
+                <Ionicons name="cube-outline" size={22} color={AppTheme.white} />
+                {cartItemCount > 0 && (
+                  <View style={styles.cartBadge}>
+                    <ThemedText style={styles.cartBadgeText}>{cartItemCount}</ThemedText>
+                  </View>
+                )}
+              </AnimatedPressable>
+              {/* Notifications */}
+              <AnimatedPressable
+                style={styles.notificationButton}
+                onPress={() => router.push('/notifications')}
+                scaleValue={0.9}
+              >
+                <Ionicons name="notifications-outline" size={22} color={AppTheme.white} />
+              </AnimatedPressable>
+            </View>
           </View>
 
           {/* Hero Content */}
@@ -679,6 +696,11 @@ const styles = StyleSheet.create({
     width: 120,
     height: 32,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   notificationButton: {
     width: 40,
     height: 40,
@@ -686,6 +708,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: AppTheme.orange,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  cartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   heroContent: {
     position: 'absolute',
@@ -759,6 +798,7 @@ const styles = StyleSheet.create({
   },
   sourceBadges: {
     marginTop: 16,
+    marginBottom: 24,
   },
   sourcesLabel: {
     color: 'rgba(255,255,255,0.6)',

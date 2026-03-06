@@ -8,7 +8,6 @@ import {
   TextInput,
   Animated,
   Pressable,
-  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +19,6 @@ import { ThemedView } from '@/components/ui/ThemedView';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { useFilterStore } from '@/store';
 
-const { width } = Dimensions.get('window');
 
 // Animated Pressable component
 const AnimatedPressable = ({ children, style, onPress, scaleValue = 0.97 }: any) => {
@@ -117,7 +115,7 @@ export default function FilterModalScreen() {
   // Local state for filters
   const [source, setSource] = useState<'all' | 'korea' | 'china' | 'dubai'>(filters.source || 'all');
   const [selectedBrands, setSelectedBrands] = useState<string[]>(filters.makes || []);
-  const [bodyType, setBodyType] = useState('');
+  const [bodyType, setBodyType] = useState(filters.bodyType || '');
   const [transmission, setTransmission] = useState(filters.transmission || '');
   const [fuelType, setFuelType] = useState(filters.fuelType || '');
   const [yearFrom, setYearFrom] = useState(filters.yearFrom || 2000);
@@ -126,6 +124,7 @@ export default function FilterModalScreen() {
   const [priceTo, setPriceTo] = useState(filters.priceTo || 200000);
   const [mileageMax, setMileageMax] = useState(filters.mileageMax || 500000);
   const [searchQuery, setSearchQuery] = useState(filters.search || '');
+  const [newArrivals, setNewArrivals] = useState(filters.newArrivals || false);
 
   const [showBrandPicker, setShowBrandPicker] = useState(false);
   const [brandSearch, setBrandSearch] = useState('');
@@ -147,6 +146,7 @@ export default function FilterModalScreen() {
       source: source,
       search: searchQuery.trim() || undefined,
       makes: selectedBrands.length > 0 ? selectedBrands : undefined,
+      bodyType: bodyType || undefined,
       transmission: transmission || undefined,
       fuelType: fuelType || undefined,
       yearFrom: yearFrom > 2000 ? yearFrom : undefined,
@@ -154,6 +154,7 @@ export default function FilterModalScreen() {
       priceFrom: priceFrom > 0 ? priceFrom : undefined,
       priceTo: priceTo < 200000 ? priceTo : undefined,
       mileageMax: mileageMax < 500000 ? mileageMax : undefined,
+      newArrivals: newArrivals || undefined,
     });
     // Navigate to live page to see results
     router.replace('/(tabs)/live');
@@ -171,6 +172,7 @@ export default function FilterModalScreen() {
     setPriceTo(200000);
     setMileageMax(500000);
     setSearchQuery('');
+    setNewArrivals(false);
     resetFilters();
   };
 
@@ -186,6 +188,7 @@ export default function FilterModalScreen() {
     priceTo < 200000,
     mileageMax < 500000,
     searchQuery.trim().length > 0,
+    newArrivals,
   ].filter(Boolean).length;
 
   const bgColor = colorScheme === 'dark' ? '#111' : '#F8F9FA';
@@ -243,6 +246,40 @@ export default function FilterModalScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
       >
+        {/* New Arrivals Toggle */}
+        <View style={styles.section}>
+          <AnimatedPressable
+            style={[
+              styles.newArrivalsToggle,
+              {
+                backgroundColor: newArrivals ? AppTheme.orange + '15' : cardBg,
+                borderColor: newArrivals ? AppTheme.orange : borderColor,
+              }
+            ]}
+            onPress={() => setNewArrivals(!newArrivals)}
+            scaleValue={0.98}
+          >
+            <View style={styles.newArrivalsLeft}>
+              <View style={[styles.newArrivalsIcon, { backgroundColor: AppTheme.orange + '20' }]}>
+                <Ionicons name="sparkles" size={18} color={AppTheme.orange} />
+              </View>
+              <View>
+                <ThemedText style={{ fontWeight: '600' }}>Nouveautés (48h)</ThemedText>
+                <ThemedText variant="muted" size="xs">Véhicules ajoutés récemment</ThemedText>
+              </View>
+            </View>
+            <View style={[
+              styles.toggleTrack,
+              { backgroundColor: newArrivals ? AppTheme.orange : borderColor }
+            ]}>
+              <View style={[
+                styles.toggleThumb,
+                { transform: [{ translateX: newArrivals ? 18 : 2 }] }
+              ]} />
+            </View>
+          </AnimatedPressable>
+        </View>
+
         {/* Source Filter */}
         <View style={styles.section}>
           <ThemedText variant="subtitle" style={styles.sectionTitle}>Source</ThemedText>
@@ -664,6 +701,39 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  newArrivalsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  newArrivalsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  newArrivalsIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleTrack: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF',
   },
   section: {
     paddingVertical: 16,

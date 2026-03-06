@@ -1,4 +1,4 @@
-import { View, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -7,16 +7,20 @@ import { Colors, AppTheme } from '@/constants/Colors';
 import { ThemedView } from '@/components/ui/ThemedView';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { useAuthStore } from '@/store';
+import { useOrderStats } from '@/hooks/useOrders';
+import { useQuotes } from '@/hooks/useQuotes';
+import { useFavorites } from '@/hooks/useFavorites';
 
 interface StatCardProps {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string | number;
   color: string;
+  loading?: boolean;
   onPress?: () => void;
 }
 
-function StatCard({ icon, label, value, color, onPress }: StatCardProps) {
+function StatCard({ icon, label, value, color, loading, onPress }: StatCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
@@ -29,7 +33,11 @@ function StatCard({ icon, label, value, color, onPress }: StatCardProps) {
       <View style={[styles.statIcon, { backgroundColor: color + '20' }]}>
         <Ionicons name={icon} size={24} color={color} />
       </View>
-      <ThemedText variant="title" size="xl" style={{ marginTop: 12 }}>{value}</ThemedText>
+      {loading ? (
+        <ActivityIndicator color={color} style={{ marginTop: 12 }} />
+      ) : (
+        <ThemedText variant="title" size="xl" style={{ marginTop: 12 }}>{value}</ThemedText>
+      )}
       <ThemedText variant="muted" size="sm" style={{ marginTop: 4 }}>{label}</ThemedText>
     </TouchableOpacity>
   );
@@ -40,6 +48,15 @@ export default function DashboardScreen() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const { profile } = useAuthStore();
+
+  // Fetch real data
+  const { data: orderStats, isLoading: ordersLoading } = useOrderStats();
+  const { data: quotesData, isLoading: quotesLoading } = useQuotes({ page: 0 });
+  const { favorites, isLoading: favoritesLoading } = useFavorites();
+
+  const quotesCount = quotesData?.total ?? 0;
+  const activeOrdersCount = (orderStats?.active ?? 0) + (orderStats?.inTransit ?? 0);
+  const favoritesCount = favorites?.length ?? 0;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -78,22 +95,25 @@ export default function DashboardScreen() {
             <StatCard
               icon="document-text"
               label="Devis"
-              value={0}
+              value={quotesCount}
               color={AppTheme.orange}
+              loading={quotesLoading}
               onPress={() => router.push('/(tabs)/quotes')}
             />
             <StatCard
               icon="cart"
               label="Commandes"
-              value={0}
+              value={activeOrdersCount}
               color={AppTheme.navy}
+              loading={ordersLoading}
               onPress={() => router.push('/orders')}
             />
             <StatCard
               icon="heart"
               label="Favoris"
-              value={0}
+              value={favoritesCount}
               color="#EF4444"
+              loading={favoritesLoading}
               onPress={() => router.push('/favorites')}
             />
             <StatCard
@@ -131,12 +151,21 @@ export default function DashboardScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => router.push('/messages')}
+                onPress={() => router.push('/(tabs)/quotes')}
               >
                 <View style={[styles.actionIcon, { backgroundColor: '#22C55E' + '20' }]}>
-                  <Ionicons name="chatbubble" size={24} color="#22C55E" />
+                  <Ionicons name="document-text" size={24} color="#22C55E" />
                 </View>
-                <ThemedText size="sm" style={{ marginTop: 8 }}>Contacter</ThemedText>
+                <ThemedText size="sm" style={{ marginTop: 8 }}>Mes devis</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => router.push('/orders')}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#8B5CF6' + '20' }]}>
+                  <Ionicons name="cube" size={24} color="#8B5CF6" />
+                </View>
+                <ThemedText size="sm" style={{ marginTop: 8 }}>Commandes</ThemedText>
               </TouchableOpacity>
             </View>
           </View>
@@ -146,15 +175,58 @@ export default function DashboardScreen() {
             <ThemedText variant="title" size="lg" style={styles.sectionTitle}>
               Activite recente
             </ThemedText>
-            <View style={styles.emptyActivity}>
-              <Ionicons name="time-outline" size={48} color={colors.textMuted} />
-              <ThemedText variant="muted" style={{ marginTop: 12, textAlign: 'center' }}>
-                Aucune activite recente
-              </ThemedText>
-              <ThemedText variant="muted" size="sm" style={{ marginTop: 4, textAlign: 'center' }}>
-                Explorez les vehicules pour commencer
-              </ThemedText>
-            </View>
+            {activeOrdersCount > 0 || quotesCount > 0 ? (
+              <View style={styles.activityList}>
+                {activeOrdersCount > 0 && (
+                  <TouchableOpacity
+                    style={[styles.activityItem, { borderColor: colors.cardBorder }]}
+                    onPress={() => router.push('/orders')}
+                  >
+                    <View style={[styles.activityIcon, { backgroundColor: AppTheme.navy + '20' }]}>
+                      <Ionicons name="cube" size={20} color={AppTheme.navy} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <ThemedText size="sm" style={{ fontWeight: '600' }}>
+                        {activeOrdersCount} commande{activeOrdersCount > 1 ? 's' : ''} en cours
+                      </ThemedText>
+                      <ThemedText variant="muted" size="xs">
+                        Suivez l'avancement de vos commandes
+                      </ThemedText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                )}
+                {quotesCount > 0 && (
+                  <TouchableOpacity
+                    style={[styles.activityItem, { borderColor: colors.cardBorder }]}
+                    onPress={() => router.push('/(tabs)/quotes')}
+                  >
+                    <View style={[styles.activityIcon, { backgroundColor: AppTheme.orange + '20' }]}>
+                      <Ionicons name="document-text" size={20} color={AppTheme.orange} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <ThemedText size="sm" style={{ fontWeight: '600' }}>
+                        {quotesCount} devis
+                      </ThemedText>
+                      <ThemedText variant="muted" size="xs">
+                        Consultez vos devis et estimations
+                      </ThemedText>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="time-outline" size={48} color={colors.textMuted} />
+                <ThemedText variant="muted" style={{ marginTop: 12, textAlign: 'center' }}>
+                  Aucune activite recente
+                </ThemedText>
+                <ThemedText variant="muted" size="sm" style={{ marginTop: 4, textAlign: 'center' }}>
+                  Explorez les vehicules pour commencer
+                </ThemedText>
+              </View>
+            )}
           </View>
         </Animated.View>
       </ScrollView>
@@ -214,6 +286,27 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  activityList: {
+    gap: 8,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityContent: {
+    flex: 1,
+    marginLeft: 12,
   },
   emptyActivity: {
     alignItems: 'center',

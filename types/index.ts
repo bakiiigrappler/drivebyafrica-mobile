@@ -4,6 +4,9 @@ export type VehicleSource = 'korea' | 'china' | 'dubai';
 export type VehicleStatus = 'available' | 'reserved' | 'sold' | 'pending';
 export type TransmissionType = 'automatic' | 'manual' | 'cvt';
 export type FuelType = 'petrol' | 'diesel' | 'hybrid' | 'electric' | 'lpg';
+export type DriveType = 'FWD' | 'RWD' | 'AWD' | '4WD';
+export type VehicleColor = 'white' | 'black' | 'silver' | 'gray' | 'red' | 'blue' | 'green' | 'brown' | 'beige' | 'other';
+export type BodyType = 'sedan' | 'suv' | 'hatchback' | 'pickup' | 'van' | 'coupe' | 'wagon' | 'convertible' | 'other';
 
 export interface VehicleFilters {
   source?: VehicleSource | 'all';
@@ -16,8 +19,13 @@ export interface VehicleFilters {
   mileageMax?: number;
   transmission?: TransmissionType | string;
   fuelType?: FuelType | string;
+  driveType?: DriveType | string;
+  color?: VehicleColor | string;
+  bodyType?: BodyType | string;
+  status?: VehicleStatus;
   search?: string;
-  sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'year_desc' | 'mileage_asc';
+  sortBy?: 'newest' | 'price_asc' | 'price_desc' | 'year_desc' | 'year_asc' | 'mileage_asc' | 'mileage_desc';
+  newArrivals?: boolean;
 }
 
 export interface PaginatedVehicles {
@@ -107,6 +115,9 @@ export interface Quote {
   vehicles?: {
     images?: string[];
   };
+  group_id?: string | null;
+  group_vehicle_count?: number;
+  container_type?: string;
 }
 
 export interface PaginatedQuotes {

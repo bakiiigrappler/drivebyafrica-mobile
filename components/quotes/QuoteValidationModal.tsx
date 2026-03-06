@@ -18,15 +18,16 @@ import type { Quote } from '@/types';
 interface QuoteValidationModalProps {
   visible: boolean;
   onClose: () => void;
-  quote: Quote | null;
+  /** Single quote or array of grouped quotes (container 40ft) */
+  quotes: Quote[];
 }
 
-// Deposit amount in USD (source of truth)
-const DEPOSIT_AMOUNT_USD = 1000;
+// Deposit amount per vehicle in USD
+const DEPOSIT_PER_VEHICLE_USD = 1000;
 
 type PaymentStep = 'initial' | 'webview' | 'verification';
 
-export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidationModalProps) {
+export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidationModalProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
@@ -36,22 +37,34 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
   const { formatPrice, convertToLocal } = useCurrency();
   const createOrderMutation = useCreateOrderFromQuote();
 
+  const vehicleCount = quotes.length;
+  const isGrouped = vehicleCount > 1;
+  const totalDepositUSD = DEPOSIT_PER_VEHICLE_USD * vehicleCount;
+
   // Format deposit amount dynamically
-  const depositFormatted = formatPrice(DEPOSIT_AMOUNT_USD);
-  const depositLocal = Math.round(convertToLocal(DEPOSIT_AMOUNT_USD));
+  const depositFormatted = formatPrice(totalDepositUSD);
+  const depositLocal = Math.round(convertToLocal(totalDepositUSD));
+  const depositPerVehicleFormatted = formatPrice(DEPOSIT_PER_VEHICLE_USD);
+
+  // Total cost sum for grouped quotes
+  const totalCostXAF = quotes.reduce((sum, q) => sum + q.total_cost_xaf, 0);
 
   // Steps with dynamic pricing
   const STEPS = [
     {
       icon: 'card-outline' as const,
       title: "Paiement de l'acompte",
-      description: `${DEPOSIT_AMOUNT_USD.toLocaleString()} USD (${depositFormatted}) pour bloquer le véhicule et lancer l'inspection.`,
+      description: isGrouped
+        ? `${totalDepositUSD.toLocaleString()} USD (${depositFormatted}) pour bloquer les ${vehicleCount} véhicules et lancer les inspections.`
+        : `${DEPOSIT_PER_VEHICLE_USD.toLocaleString()} USD (${depositPerVehicleFormatted}) pour bloquer le véhicule et lancer l'inspection.`,
       active: true,
     },
     {
       icon: 'document-text-outline' as const,
       title: "Inspection détaillée",
-      description: "Nos experts vérifient le véhicule et vous envoient un rapport complet.",
+      description: isGrouped
+        ? "Nos experts vérifient chaque véhicule et vous envoient les rapports complets."
+        : "Nos experts vérifient le véhicule et vous envoient un rapport complet.",
       active: false,
     },
     {
@@ -63,7 +76,9 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     {
       icon: 'boat-outline' as const,
       title: "Expédition",
-      description: "Le véhicule est chargé et expédié vers votre destination.",
+      description: isGrouped
+        ? "Les véhicules sont chargés dans le container 40ft et expédiés."
+        : "Le véhicule est chargé et expédié vers votre destination.",
       active: false,
     },
   ];
@@ -76,7 +91,11 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     externalReference: string;
   } | null>(null);
 
-  if (!quote) return null;
+  if (quotes.length === 0) return null;
+
+  // Use first quote for shared info (destination, source)
+  const firstQuote = quotes[0];
+  const vehiclesSummary = quotes.map(q => `${q.vehicle_make} ${q.vehicle_model}`).join(' + ');
 
   const handleClose = () => {
     setIsPaymentLoading(false);
@@ -86,7 +105,7 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     onClose();
   };
 
-  // Initiate payment - opens E-Billing portal directly
+  // Initiate payment
   const handlePayment = async () => {
     if (!user) {
       showSnackbar({ message: 'Vous devez être connecté', type: 'error' });
@@ -96,7 +115,10 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     setIsPaymentLoading(true);
 
     try {
-      const description = `Acompte devis ${quote.quote_number} - ${quote.vehicle_make} ${quote.vehicle_model}`;
+      const quoteNumbers = quotes.map(q => q.quote_number).join(', ');
+      const description = isGrouped
+        ? `Acompte container 40ft (${vehicleCount} véh.) - ${quoteNumbers}`
+        : `Acompte devis ${firstQuote.quote_number} - ${firstQuote.vehicle_make} ${firstQuote.vehicle_model}`;
 
       const result = await createPayment(
         user.id,
@@ -122,31 +144,26 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     }
   };
 
-  // WebView closed - start verification
   const handleWebViewClose = () => {
     setPaymentStep('verification');
   };
 
-  // WebView cancelled
   const handleWebViewCancel = () => {
     showSnackbar({ message: 'Paiement annulé', type: 'warning' });
     setPaymentStep('initial');
     setWebViewData(null);
   };
 
-  // Verification successful
   const handleVerificationSuccess = async (_status: PaymentStatusResult) => {
     await processSuccessfulPayment(webViewData?.externalReference);
   };
 
-  // Verification cancelled
   const handleVerificationCancel = () => {
     showSnackbar({ message: 'Vérification annulée', type: 'warning' });
     setPaymentStep('initial');
     setWebViewData(null);
   };
 
-  // Verification timeout
   const handleVerificationTimeout = () => {
     showSnackbar({
       message: 'Délai de vérification dépassé. Si vous avez payé, contactez le support.',
@@ -155,42 +172,54 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     });
   };
 
-  // Process successful payment - create order using the hook
+  // Process successful payment - create one order per quote
   const processSuccessfulPayment = async (paymentReference?: string) => {
-    if (!user || !quote) return;
+    if (!user) return;
 
-    showSnackbar({ message: 'Paiement validé! Création de la commande...', type: 'success' });
+    showSnackbar({
+      message: isGrouped
+        ? `Paiement validé! Création des ${vehicleCount} commandes...`
+        : 'Paiement validé! Création de la commande...',
+      type: 'success',
+    });
 
     try {
-      await createOrderMutation.mutateAsync({
-        quoteId: quote.id,
-        vehicleId: quote.vehicle_id,
-        vehicleMake: quote.vehicle_make,
-        vehicleModel: quote.vehicle_model,
-        vehicleYear: quote.vehicle_year,
-        vehicleSource: quote.vehicle_source,
-        vehiclePriceUsd: quote.vehicle_price_usd,
-        destinationName: quote.destination_name,
-        destinationCountry: quote.destination_country,
-        shippingType: quote.shipping_type as 'container' | 'groupage',
-        shippingCostXaf: quote.shipping_cost_xaf,
-        insuranceCostXaf: quote.insurance_cost_xaf,
-        totalCostXaf: quote.total_cost_xaf,
-        depositAmountUsd: DEPOSIT_AMOUNT_USD,
-        depositAmountXaf: depositLocal,
-        depositPaymentReference: paymentReference || webViewData?.externalReference || 'DEMO',
-        depositPaymentMethod: paymentReference ? 'mobile_money' : 'demo',
-        customerName: profile?.full_name || undefined,
-        customerEmail: user.email || undefined,
-        customerWhatsapp: profile?.whatsapp_number || undefined,
-      });
+      const depositPerVehicleLocal = Math.round(convertToLocal(DEPOSIT_PER_VEHICLE_USD));
 
-      // Invalidate quotes cache
+      for (const quote of quotes) {
+        await createOrderMutation.mutateAsync({
+          quoteId: quote.id,
+          vehicleId: quote.vehicle_id,
+          vehicleMake: quote.vehicle_make,
+          vehicleModel: quote.vehicle_model,
+          vehicleYear: quote.vehicle_year,
+          vehicleSource: quote.vehicle_source,
+          vehiclePriceUsd: quote.vehicle_price_usd,
+          destinationName: quote.destination_name,
+          destinationCountry: quote.destination_country,
+          shippingType: quote.shipping_type as 'container' | 'groupage',
+          shippingCostXaf: quote.shipping_cost_xaf,
+          insuranceCostXaf: quote.insurance_cost_xaf,
+          totalCostXaf: quote.total_cost_xaf,
+          depositAmountUsd: DEPOSIT_PER_VEHICLE_USD,
+          depositAmountXaf: depositPerVehicleLocal,
+          depositPaymentReference: paymentReference || webViewData?.externalReference || 'DEMO',
+          depositPaymentMethod: paymentReference ? 'mobile_money' : 'demo',
+          customerName: profile?.full_name || undefined,
+          customerEmail: user.email || undefined,
+          customerWhatsapp: profile?.whatsapp_number || undefined,
+        });
+      }
+
       invalidateLists();
 
-      showSnackbar({ message: 'Commande créée avec succès!', type: 'success' });
+      showSnackbar({
+        message: isGrouped
+          ? `${vehicleCount} commandes créées avec succès!`
+          : 'Commande créée avec succès!',
+        type: 'success',
+      });
 
-      // Close modal and navigate to orders
       handleClose();
       router.push('/(tabs)/orders');
     } catch (error) {
@@ -200,7 +229,6 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     }
   };
 
-  // Demo payment handler (for testing)
   const handleDemoPayment = async () => {
     if (!user) {
       showSnackbar({ message: 'Vous devez être connecté', type: 'error' });
@@ -210,11 +238,12 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
     setIsDemoLoading(true);
     showSnackbar({ message: 'Simulation du paiement en cours...', type: 'info' });
 
-    // Simulate payment delay
     await new Promise(resolve => setTimeout(resolve, 2000));
-
     await processSuccessfulPayment();
   };
+
+  const formatCurrency = (amount: number) =>
+    Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FCFA';
 
   return (
     <>
@@ -228,9 +257,17 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={styles.headerContent}>
-              <ThemedText variant="title" size="lg">Validation du devis</ThemedText>
-              <ThemedText variant="muted" size="sm" numberOfLines={1}>
-                {quote.vehicle_make} {quote.vehicle_model} ({quote.vehicle_year}) - N° {quote.quote_number}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <ThemedText variant="title" size="lg">Validation du devis</ThemedText>
+                {isGrouped && (
+                  <View style={styles.groupBadge}>
+                    <Ionicons name="cube-outline" size={12} color="#2563EB" />
+                    <ThemedText style={styles.groupBadgeText}>40ft</ThemedText>
+                  </View>
+                )}
+              </View>
+              <ThemedText variant="muted" size="sm" numberOfLines={2}>
+                {vehiclesSummary}
               </ThemedText>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
@@ -239,6 +276,37 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {/* Grouped vehicles list */}
+            {isGrouped && (
+              <View style={[styles.vehiclesList, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+                <ThemedText style={styles.sectionTitle}>VÉHICULES ({vehicleCount})</ThemedText>
+                {quotes.map((q, i) => (
+                  <View key={q.id} style={[styles.vehicleRow, i < quotes.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.cardBorder }]}>
+                    <View style={styles.vehicleIndex}>
+                      <ThemedText style={styles.vehicleIndexText}>{i + 1}</ThemedText>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={{ fontWeight: '600', fontSize: 14 }}>
+                        {q.vehicle_make} {q.vehicle_model} ({q.vehicle_year})
+                      </ThemedText>
+                      <ThemedText variant="muted" size="xs">
+                        N° {q.quote_number}
+                      </ThemedText>
+                    </View>
+                    <ThemedText style={{ fontWeight: '700', fontSize: 13, color: AppTheme.orange }}>
+                      {formatCurrency(q.total_cost_xaf)}
+                    </ThemedText>
+                  </View>
+                ))}
+                <View style={[styles.vehicleTotalRow, { borderTopColor: colors.cardBorder }]}>
+                  <ThemedText style={{ fontWeight: '800', fontSize: 15 }}>Total</ThemedText>
+                  <ThemedText style={{ fontWeight: '800', fontSize: 16, color: AppTheme.orange }}>
+                    {formatCurrency(totalCostXAF)}
+                  </ThemedText>
+                </View>
+              </View>
+            )}
+
             {/* Guarantee Info */}
             <View style={[styles.infoCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
               <View style={[styles.infoIcon, { backgroundColor: '#DBEAFE' }]}>
@@ -296,16 +364,20 @@ export function QuoteValidationModal({ visible, onClose, quote }: QuoteValidatio
                 </View>
                 <View style={styles.paymentInfo}>
                   <ThemedText style={styles.paymentTitle}>
-                    Acompte pour bloquer le véhicule
+                    {isGrouped
+                      ? `Acompte pour bloquer les ${vehicleCount} véhicules`
+                      : 'Acompte pour bloquer le véhicule'}
                   </ThemedText>
                   <ThemedText style={[styles.paymentSubtitle, { color: '#6B7280' }]}>
-                    Déclenche l'inspection détaillée du véhicule
+                    {isGrouped
+                      ? `${DEPOSIT_PER_VEHICLE_USD.toLocaleString()} USD × ${vehicleCount} véhicules`
+                      : "Déclenche l'inspection détaillée du véhicule"}
                   </ThemedText>
                 </View>
               </View>
 
               <View style={styles.paymentAmount}>
-                <ThemedText style={styles.amountValue}>{DEPOSIT_AMOUNT_USD.toLocaleString()} USD</ThemedText>
+                <ThemedText style={styles.amountValue}>{totalDepositUSD.toLocaleString()} USD</ThemedText>
                 <ThemedText style={styles.amountEquiv}>≈ {depositFormatted}</ThemedText>
               </View>
 
@@ -417,12 +489,59 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 16,
   },
+  groupBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  groupBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
   closeButton: {
     padding: 8,
   },
   content: {
     flex: 1,
     padding: 16,
+  },
+  vehiclesList: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+  },
+  vehicleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 10,
+  },
+  vehicleIndex: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: AppTheme.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleIndexText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  vehicleTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    marginTop: 4,
+    borderTopWidth: 1,
   },
   infoCard: {
     flexDirection: 'row',
