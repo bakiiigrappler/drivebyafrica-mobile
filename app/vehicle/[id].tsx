@@ -613,7 +613,7 @@ export default function VehicleDetailScreen() {
               onPress={handleAddToCart}
             >
               <Ionicons
-                name={isInCart ? 'checkmark-circle' : 'cube-outline'}
+                name={isInCart ? 'checkmark-circle' : 'cart-outline'}
                 size={18}
                 color={isInCart ? '#fff' : AppTheme.orange}
               />

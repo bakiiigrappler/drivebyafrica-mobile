@@ -261,7 +261,7 @@ export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidati
                 <ThemedText variant="title" size="lg">Validation du devis</ThemedText>
                 {isGrouped && (
                   <View style={styles.groupBadge}>
-                    <Ionicons name="cube-outline" size={12} color="#2563EB" />
+                    <Ionicons name="cart-outline" size={12} color="#2563EB" />
                     <ThemedText style={styles.groupBadgeText}>40ft</ThemedText>
                   </View>
                 )}

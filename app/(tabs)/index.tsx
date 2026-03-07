@@ -294,7 +294,7 @@ export default function ExploreScreen() {
                 onPress={() => router.push('/cart')}
                 scaleValue={0.9}
               >
-                <Ionicons name="cube-outline" size={22} color={AppTheme.white} />
+                <Ionicons name="cart-outline" size={22} color={AppTheme.white} />
                 {cartItemCount > 0 && (
                   <View style={styles.cartBadge}>
                     <ThemedText style={styles.cartBadgeText}>{cartItemCount}</ThemedText>

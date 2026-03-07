@@ -43,7 +43,7 @@ const getShippingTypes = (lang: Language) => [
     id: 'container' as const,
     label: t('quotes.containerOnly', lang),
     description: t('quotes.containerDesc', lang),
-    icon: 'cube-outline' as const,
+    icon: 'cart-outline' as const,
   },
   {
     id: 'groupage' as const,

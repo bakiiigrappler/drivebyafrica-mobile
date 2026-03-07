@@ -189,7 +189,7 @@ export default function CartScreen() {
       <ThemedView style={styles.container}>
         <View style={styles.emptyContainer}>
           <View style={[styles.emptyIcon, { backgroundColor: AppTheme.orange + '15' }]}>
-            <Ionicons name="cube-outline" size={48} color={AppTheme.orange} />
+            <Ionicons name="cart-outline" size={48} color={AppTheme.orange} />
           </View>
           <ThemedText variant="title" size="lg" style={styles.emptyTitle}>
             {t('cart.empty', language)}
