@@ -17,36 +17,28 @@ import { QuotePreviewModal, QuotePreviewData } from '@/components/quotes/QuotePr
 import {
   ShippingDestination,
   DEFAULT_DESTINATIONS,
-  SHIPPING_MULTIPLIERS,
   XAF_RATE,
-  calculateImportCosts,
+  INSURANCE_RATE,
+  INSPECTION_FEE_XAF,
   formatFCFA,
   formatUSD,
   getExportTax,
 } from '@/lib/pricing';
 import { useSettingsStore } from '@/store';
-import { t, type Language } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 import type { VehicleBatch } from '@/types';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-type ShippingType = 'container' | 'groupage';
+type BatchShippingType = '20hq' | '40hq' | 'roro' | 'flat_rack';
 
-const getShippingTypes = (lang: Language) => [
-  {
-    id: 'container' as const,
-    label: t('quotes.containerOnly', lang),
-    description: t('quotes.containerDesc', lang),
-    icon: 'cart-outline' as const,
-  },
-  {
-    id: 'groupage' as const,
-    label: t('quotes.groupage', lang),
-    description: t('quotes.groupageDesc', lang),
-    icon: 'grid-outline' as const,
-  },
-];
+const BATCH_SHIPPING_CONFIG: Record<BatchShippingType, { vehiclesPerUnit: number; label: string; unitLabel: string; icon: keyof typeof Ionicons.glyphMap }> = {
+  '20hq': { vehiclesPerUnit: 2, label: 'Container 20HQ', unitLabel: 'container', icon: 'cart-outline' },
+  '40hq': { vehiclesPerUnit: 4, label: 'Container 40HQ', unitLabel: 'container', icon: 'cube-outline' },
+  'roro': { vehiclesPerUnit: 1, label: 'RORO (Roll-on/Roll-off)', unitLabel: 'véhicule', icon: 'car-outline' },
+  'flat_rack': { vehiclesPerUnit: 1, label: 'Flat Rack', unitLabel: 'unité', icon: 'grid-outline' },
+};
 
 interface BatchOrderModalProps {
   visible: boolean;
@@ -60,14 +52,14 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
   const colors = Colors[colorScheme];
   const router = useRouter();
   const { language } = useSettingsStore();
-  const SHIPPING_TYPES = getShippingTypes(language);
 
   const [destinations, setDestinations] = useState<ShippingDestination[]>(DEFAULT_DESTINATIONS);
   const [selectedDestination, setSelectedDestination] = useState<ShippingDestination | null>(null);
-  const [selectedShippingType, setSelectedShippingType] = useState<ShippingType>('container');
+  const [selectedShippingType, setSelectedShippingType] = useState<BatchShippingType>('40hq');
   const [showDestinations, setShowDestinations] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [quantity, setQuantity] = useState('');
+  const [destinationSearch, setDestinationSearch] = useState('');
 
   // Load destinations from API
   useEffect(() => {
@@ -94,6 +86,21 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
                 china: d.china_cost_usd || 5000,
                 dubai: d.dubai_cost_usd || 4000,
               },
+              shippingCost40ft: {
+                korea: d.korea_cost_40ft_usd || 0,
+                china: d.china_cost_40ft_usd || 0,
+                dubai: d.dubai_cost_40ft_usd || 0,
+              },
+              shippingCostRoro: {
+                korea: d.korea_roro_usd || 0,
+                china: d.china_roro_usd || 0,
+                dubai: d.dubai_roro_usd || 0,
+              },
+              shippingCostFlatRack: {
+                korea: d.korea_flat_rack_usd || 0,
+                china: d.china_flat_rack_usd || 0,
+                dubai: d.dubai_flat_rack_usd || 0,
+              },
             }));
             setDestinations(mapped);
           }
@@ -112,54 +119,80 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
   useEffect(() => {
     if (visible && batch) {
       setSelectedDestination(null);
-      setSelectedShippingType('container');
+      setSelectedShippingType('40hq');
       setShowDestinations(false);
+      setDestinationSearch('');
       setShowPreview(false);
       setQuantity(batch.minimum_order_quantity.toString());
     }
   }, [visible, batch]);
 
   const vehicleSource = batch?.source_country || 'korea';
+  const sourceKey = vehicleSource as 'korea' | 'china' | 'dubai';
   const qty = parseInt(quantity) || 0;
   const totalVehiclePriceUsd = (batch?.price_per_unit_usd || 0) * qty;
 
-  // Calculate costs
+  const shippingConfig = BATCH_SHIPPING_CONFIG[selectedShippingType];
+  const { vehiclesPerUnit } = shippingConfig;
+
+  // Filter destinations based on search
+  const filteredDestinations = useMemo(() => {
+    if (!destinationSearch.trim()) return destinations;
+    const q = destinationSearch.toLowerCase();
+    return destinations.filter(
+      (d) => d.name.toLowerCase().includes(q) || d.country.toLowerCase().includes(q)
+    );
+  }, [destinations, destinationSearch]);
+
+  // Calculate costs matching web logic (vehiclesPerUnit, different cost sources)
   const costs = useMemo(() => {
     if (!batch || !selectedDestination || qty <= 0) return null;
 
-    const shippingCostPerUnitUSD = selectedDestination.shippingCost[vehicleSource as keyof typeof selectedDestination.shippingCost] || 4500;
-    const multiplier = SHIPPING_MULTIPLIERS[selectedShippingType];
+    const exportTaxUSD = getExportTax(vehicleSource);
+    const effectiveUnitPriceUSD = batch.price_per_unit_usd + exportTaxUSD;
+    const totalVehiclePriceUSD = effectiveUnitPriceUSD * qty;
 
-    // Calculate per-unit costs then multiply by quantity
-    const perUnit = calculateImportCosts({
-      vehiclePriceUSD: batch.price_per_unit_usd,
-      vehicleSource,
-      shippingCostUSD: shippingCostPerUnitUSD,
-      xafRate: XAF_RATE,
-      shippingMultiplier: multiplier,
-    });
+    // Get shipping cost per unit based on shipping type
+    let costPerUnit: number;
+    if (selectedShippingType === 'roro') {
+      costPerUnit = selectedDestination.shippingCostRoro[sourceKey] || 0;
+    } else if (selectedShippingType === 'flat_rack') {
+      costPerUnit = selectedDestination.shippingCostFlatRack[sourceKey] || 0;
+    } else if (selectedShippingType === '20hq') {
+      costPerUnit = selectedDestination.shippingCost[sourceKey] || 0;
+    } else {
+      costPerUnit = selectedDestination.shippingCost40ft[sourceKey] || 0;
+    }
+
+    const numberOfUnits = Math.ceil(qty / vehiclesPerUnit);
+    const totalShippingCostUSD = numberOfUnits * costPerUnit;
+
+    // Insurance: 2.5% of (vehicle price + shipping)
+    const insuranceCostUSD = (totalVehiclePriceUSD + totalShippingCostUSD) * INSURANCE_RATE;
+    const totalInspectionFeeUSD = (INSPECTION_FEE_XAF / XAF_RATE) * qty;
+
+    const totalUSD = totalVehiclePriceUSD + totalShippingCostUSD + insuranceCostUSD + totalInspectionFeeUSD;
 
     return {
-      ...perUnit,
-      // Override with total (qty × per-unit)
-      vehiclePriceXAF: perUnit.vehiclePriceXAF * qty,
-      exportTaxXAF: perUnit.exportTaxXAF * qty,
-      shippingCostXAF: perUnit.shippingCostXAF * qty,
-      insuranceCostXAF: perUnit.insuranceCostXAF * qty,
-      inspectionFeeXAF: perUnit.inspectionFeeXAF * qty,
-      totalXAF: perUnit.totalXAF * qty,
-      totalUSD: perUnit.totalUSD * qty,
-      // Keep per-unit for display
-      perUnitTotalXAF: perUnit.totalXAF,
-      perUnitTotalUSD: perUnit.totalUSD,
+      vehiclePriceXAF: Math.round(totalVehiclePriceUSD * XAF_RATE),
+      exportTaxXAF: Math.round(exportTaxUSD * qty * XAF_RATE),
+      shippingCostXAF: Math.round(totalShippingCostUSD * XAF_RATE),
+      insuranceCostXAF: Math.round(insuranceCostUSD * XAF_RATE),
+      inspectionFeeXAF: Math.round(INSPECTION_FEE_XAF * qty),
+      totalXAF: Math.round(totalUSD * XAF_RATE),
+      totalUSD: Math.round(totalUSD),
+      numberOfUnits,
+      costPerUnit,
+      hasExportTax: exportTaxUSD > 0,
     };
-  }, [batch, selectedDestination, selectedShippingType, vehicleSource, qty]);
+  }, [batch, selectedDestination, selectedShippingType, vehicleSource, sourceKey, qty, vehiclesPerUnit]);
 
   if (!batch) return null;
 
   const handleSelectDestination = (dest: ShippingDestination) => {
     setSelectedDestination(dest);
     setShowDestinations(false);
+    setDestinationSearch('');
   };
 
   const handleContinueToPreview = () => {
@@ -194,7 +227,7 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
       country: selectedDestination.country,
       flag: selectedDestination.flag,
     },
-    shippingType: selectedShippingType,
+    shippingType: 'container',
     costs: {
       vehiclePriceXAF: costs.vehiclePriceXAF,
       exportTaxXAF: costs.exportTaxXAF,
@@ -326,26 +359,49 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
 
             {showDestinations && (
               <View style={[styles.dropdownList, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-                <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled>
-                  {destinations.map((dest) => (
-                    <TouchableOpacity
-                      key={dest.id}
-                      style={[
-                        styles.dropdownItem,
-                        selectedDestination?.id === dest.id && { backgroundColor: AppTheme.orange + '20' },
-                      ]}
-                      onPress={() => handleSelectDestination(dest)}
-                    >
-                      <ThemedText style={{ fontSize: 18, marginRight: 10 }}>{dest.flag}</ThemedText>
-                      <View style={{ flex: 1 }}>
-                        <ThemedText variant="subtitle" size="sm">{dest.name}</ThemedText>
-                        <ThemedText variant="muted" size="xs">{dest.country}</ThemedText>
-                      </View>
-                      {selectedDestination?.id === dest.id && (
-                        <Ionicons name="checkmark" size={20} color={AppTheme.orange} />
-                      )}
+                {/* Search input */}
+                <View style={[styles.searchContainer, { borderBottomColor: colors.border }]}>
+                  <Ionicons name="search" size={16} color={colors.textMuted} />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.textPrimary }]}
+                    placeholder={t('quotes.searchDestination', language) || 'Rechercher...'}
+                    placeholderTextColor={colors.textMuted}
+                    value={destinationSearch}
+                    onChangeText={setDestinationSearch}
+                    autoFocus
+                  />
+                  {destinationSearch.length > 0 && (
+                    <TouchableOpacity onPress={() => setDestinationSearch('')}>
+                      <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                     </TouchableOpacity>
-                  ))}
+                  )}
+                </View>
+                <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+                  {filteredDestinations.length > 0 ? (
+                    filteredDestinations.map((dest) => (
+                      <TouchableOpacity
+                        key={dest.id}
+                        style={[
+                          styles.dropdownItem,
+                          selectedDestination?.id === dest.id && { backgroundColor: AppTheme.orange + '20' },
+                        ]}
+                        onPress={() => handleSelectDestination(dest)}
+                      >
+                        <ThemedText style={{ fontSize: 18, marginRight: 10 }}>{dest.flag}</ThemedText>
+                        <View style={{ flex: 1 }}>
+                          <ThemedText variant="subtitle" size="sm">{dest.name}</ThemedText>
+                          <ThemedText variant="muted" size="xs">{dest.country}</ThemedText>
+                        </View>
+                        {selectedDestination?.id === dest.id && (
+                          <Ionicons name="checkmark" size={20} color={AppTheme.orange} />
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <View style={{ padding: 16, alignItems: 'center' }}>
+                      <ThemedText variant="muted" size="sm">Aucune destination trouvée</ThemedText>
+                    </View>
+                  )}
                 </ScrollView>
               </View>
             )}
@@ -359,28 +415,28 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
               </ThemedText>
 
               <View style={styles.shippingTypes}>
-                {SHIPPING_TYPES.map((type) => (
+                {(Object.entries(BATCH_SHIPPING_CONFIG) as [BatchShippingType, typeof BATCH_SHIPPING_CONFIG[BatchShippingType]][]).map(([id, config]) => (
                   <TouchableOpacity
-                    key={type.id}
+                    key={id}
                     style={[
                       styles.shippingTypeCard,
                       { backgroundColor: colors.cardBg, borderColor: colors.cardBorder },
-                      selectedShippingType === type.id && { borderColor: AppTheme.orange, borderWidth: 2 },
+                      selectedShippingType === id && { borderColor: AppTheme.orange, borderWidth: 2 },
                     ]}
-                    onPress={() => setSelectedShippingType(type.id)}
+                    onPress={() => setSelectedShippingType(id)}
                   >
                     <View style={[styles.shippingTypeIcon, { backgroundColor: AppTheme.orange + '15' }]}>
-                      <Ionicons name={type.icon} size={24} color={AppTheme.orange} />
+                      <Ionicons name={config.icon as any} size={22} color={AppTheme.orange} />
                     </View>
-                    <ThemedText variant="subtitle" size="sm" style={{ marginTop: 8 }}>
-                      {type.label}
+                    <ThemedText variant="subtitle" size="xs" style={{ marginTop: 6, textAlign: 'center' }} numberOfLines={2}>
+                      {config.label}
                     </ThemedText>
-                    <ThemedText variant="muted" size="xs" style={{ textAlign: 'center', marginTop: 4 }}>
-                      {type.description}
+                    <ThemedText variant="muted" size="xs" style={{ textAlign: 'center', marginTop: 2 }}>
+                      {config.vehiclesPerUnit > 1 ? `${config.vehiclesPerUnit} véh.` : `par ${config.unitLabel}`}
                     </ThemedText>
-                    {selectedShippingType === type.id && (
+                    {selectedShippingType === id && (
                       <View style={styles.selectedCheck}>
-                        <Ionicons name="checkmark-circle" size={20} color={AppTheme.orange} />
+                        <Ionicons name="checkmark-circle" size={18} color={AppTheme.orange} />
                       </View>
                     )}
                   </TouchableOpacity>
@@ -397,30 +453,39 @@ export function BatchOrderModal({ visible, onClose, batch, onSuccess }: BatchOrd
               </ThemedText>
 
               <View style={styles.costRow}>
-                <ThemedText variant="muted">{t('quotes.vehiclePrice', language)} (×{qty})</ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText variant="muted">{t('quotes.vehiclePrice', language)} (FOB)</ThemedText>
+                  <ThemedText variant="muted" size="xs">
+                    {formatFCFA(Math.round((batch.price_per_unit_usd + getExportTax(vehicleSource)) * XAF_RATE))} × {qty}
+                  </ThemedText>
+                </View>
                 <ThemedText>{formatFCFA(costs.vehiclePriceXAF)}</ThemedText>
               </View>
-              {hasExportTax && (
-                <View style={styles.costRow}>
-                  <ThemedText variant="muted">{t('quotes.exportTax', language)} (×{qty})</ThemedText>
-                  <ThemedText>{formatFCFA(costs.exportTaxXAF)}</ThemedText>
-                </View>
-              )}
               <View style={styles.costRow}>
-                <ThemedText variant="muted">{t('quotes.maritimeTransport', language)} (×{qty})</ThemedText>
+                <View style={{ flex: 1 }}>
+                  <ThemedText variant="muted">{t('quotes.maritimeTransport', language)}</ThemedText>
+                  <ThemedText variant="muted" size="xs" style={{ color: AppTheme.orange }}>
+                    {shippingConfig.label} × {costs.numberOfUnits} ({formatUSD(costs.costPerUnit)}/{shippingConfig.unitLabel === 'véhicule' ? 'véh.' : shippingConfig.unitLabel === 'unité' ? 'unité' : 'cont.'})
+                  </ThemedText>
+                </View>
                 <ThemedText>{formatFCFA(costs.shippingCostXAF)}</ThemedText>
               </View>
               <View style={styles.costRow}>
-                <ThemedText variant="muted">{t('quotes.cargoInsurance', language)}</ThemedText>
+                <ThemedText variant="muted">{t('quotes.cargoInsurance', language)} (2.5%)</ThemedText>
                 <ThemedText>{formatFCFA(costs.insuranceCostXAF)}</ThemedText>
               </View>
               <View style={styles.costRow}>
-                <ThemedText variant="muted">{t('quotes.inspectionDocs', language)} (×{qty})</ThemedText>
+                <ThemedText variant="muted">{t('quotes.inspectionDocs', language)} × {qty}</ThemedText>
                 <ThemedText>{formatFCFA(costs.inspectionFeeXAF)}</ThemedText>
               </View>
 
               <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-                <ThemedText variant="title">{t('quotes.estimatedTotal', language)}</ThemedText>
+                <View>
+                  <ThemedText variant="title">{t('quotes.estimatedTotal', language)}</ThemedText>
+                  {costs.hasExportTax && (
+                    <ThemedText variant="muted" size="xs">Inclut taxe export</ThemedText>
+                  )}
+                </View>
                 <ThemedText variant="title" style={{ color: AppTheme.orange }}>
                   {formatFCFA(costs.totalXAF)}
                 </ThemedText>
@@ -572,23 +637,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.05)',
   },
+  // Search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
   // Shipping types
   shippingTypes: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   shippingTypeCard: {
-    flex: 1,
-    padding: 16,
+    flexBasis: '47%' as any,
+    flexGrow: 1,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     position: 'relative',
   },
   shippingTypeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -129,6 +129,8 @@ const translations: Record<Language, Record<string, string>> = {
     'quotes.viewQuote': 'Voir le devis',
     'quotes.attention': 'Attention',
     'quotes.selectDestinationAlert': 'Veuillez sélectionner une destination',
+    'quotes.searchDestination': 'Rechercher un pays ou une ville...',
+    'quotes.groupageWarning': 'Le groupage maritime est soumis à disponibilité et peut entraîner des délais supplémentaires.',
 
     // ── Cart (Container 40ft) ──
     'cart.title': 'Container 40 pieds',
@@ -585,6 +587,8 @@ const translations: Record<Language, Record<string, string>> = {
     'quotes.viewQuote': 'View quote',
     'quotes.attention': 'Attention',
     'quotes.selectDestinationAlert': 'Please select a destination',
+    'quotes.searchDestination': 'Search a country or city...',
+    'quotes.groupageWarning': 'Shared shipping is subject to availability and may result in additional delays.',
 
     // ── Cart (40ft Container) ──
     'cart.title': '40ft Container',
@@ -1041,6 +1045,8 @@ const translations: Record<Language, Record<string, string>> = {
     'quotes.viewQuote': '查看报价',
     'quotes.attention': '注意',
     'quotes.selectDestinationAlert': '请选择目的地',
+    'quotes.searchDestination': '搜索国家或城市...',
+    'quotes.groupageWarning': '拼箱运输取决于可用性，可能会导致额外延迟。',
 
     // ── Cart (40尺集装箱) ──
     'cart.title': '40尺集装箱',

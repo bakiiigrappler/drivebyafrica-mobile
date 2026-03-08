@@ -4,6 +4,7 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
+  TextInput,
   ScrollView,
   Alert,
 } from 'react-native';
@@ -65,6 +66,7 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
   const [selectedShippingType, setSelectedShippingType] = useState<ShippingType>('container');
   const [showDestinations, setShowDestinations] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [destinationSearch, setDestinationSearch] = useState('');
 
   // Load destinations from API
   useEffect(() => {
@@ -91,6 +93,21 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
                 china: d.china_cost_usd || 5000,
                 dubai: d.dubai_cost_usd || 4000,
               },
+              shippingCost40ft: {
+                korea: d.korea_cost_40ft_usd || 0,
+                china: d.china_cost_40ft_usd || 0,
+                dubai: d.dubai_cost_40ft_usd || 0,
+              },
+              shippingCostRoro: {
+                korea: d.korea_roro_usd || 0,
+                china: d.china_roro_usd || 0,
+                dubai: d.dubai_roro_usd || 0,
+              },
+              shippingCostFlatRack: {
+                korea: d.korea_flat_rack_usd || 0,
+                china: d.china_flat_rack_usd || 0,
+                dubai: d.dubai_flat_rack_usd || 0,
+              },
             }));
             setDestinations(mapped);
           }
@@ -112,8 +129,18 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
       setSelectedShippingType('container');
       setShowDestinations(false);
       setShowPreview(false);
+      setDestinationSearch('');
     }
   }, [visible]);
+
+  // Filter destinations by search
+  const filteredDestinations = useMemo(() => {
+    if (!destinationSearch.trim()) return destinations;
+    const q = destinationSearch.toLowerCase();
+    return destinations.filter(
+      (d) => d.name.toLowerCase().includes(q) || d.country.toLowerCase().includes(q)
+    );
+  }, [destinations, destinationSearch]);
 
   // Get vehicle price
   const vehiclePrice = vehicle.start_price_usd ?? vehicle.buy_now_price_usd ?? vehicle.current_price_usd ?? 0;
@@ -138,6 +165,7 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
   const handleSelectDestination = (dest: ShippingDestination) => {
     setSelectedDestination(dest);
     setShowDestinations(false);
+    setDestinationSearch('');
   };
 
   const handleContinueToPreview = () => {
@@ -246,26 +274,49 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
 
                 {showDestinations && (
                   <View style={[styles.dropdownList, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder }]}>
-                    <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled>
-                      {destinations.map((dest) => (
-                        <TouchableOpacity
-                          key={dest.id}
-                          style={[
-                            styles.dropdownItem,
-                            selectedDestination?.id === dest.id && { backgroundColor: AppTheme.orange + '20' },
-                          ]}
-                          onPress={() => handleSelectDestination(dest)}
-                        >
-                          <ThemedText style={{ fontSize: 18, marginRight: 10 }}>{dest.flag}</ThemedText>
-                          <View style={{ flex: 1 }}>
-                            <ThemedText variant="subtitle" size="sm">{dest.name}</ThemedText>
-                            <ThemedText variant="muted" size="xs">{dest.country}</ThemedText>
-                          </View>
-                          {selectedDestination?.id === dest.id && (
-                            <Ionicons name="checkmark" size={20} color={AppTheme.orange} />
-                          )}
+                    {/* Search input */}
+                    <View style={[styles.searchContainer, { borderBottomColor: colors.border }]}>
+                      <Ionicons name="search" size={16} color={colors.textMuted} />
+                      <TextInput
+                        style={[styles.searchInput, { color: colors.textPrimary }]}
+                        placeholder={t('quotes.searchDestination', language) || 'Rechercher...'}
+                        placeholderTextColor={colors.textMuted}
+                        value={destinationSearch}
+                        onChangeText={setDestinationSearch}
+                        autoFocus
+                      />
+                      {destinationSearch.length > 0 && (
+                        <TouchableOpacity onPress={() => setDestinationSearch('')}>
+                          <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                         </TouchableOpacity>
-                      ))}
+                      )}
+                    </View>
+                    <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
+                      {filteredDestinations.length > 0 ? (
+                        filteredDestinations.map((dest) => (
+                          <TouchableOpacity
+                            key={dest.id}
+                            style={[
+                              styles.dropdownItem,
+                              selectedDestination?.id === dest.id && { backgroundColor: AppTheme.orange + '20' },
+                            ]}
+                            onPress={() => handleSelectDestination(dest)}
+                          >
+                            <ThemedText style={{ fontSize: 18, marginRight: 10 }}>{dest.flag}</ThemedText>
+                            <View style={{ flex: 1 }}>
+                              <ThemedText variant="subtitle" size="sm">{dest.name}</ThemedText>
+                              <ThemedText variant="muted" size="xs">{dest.country}</ThemedText>
+                            </View>
+                            {selectedDestination?.id === dest.id && (
+                              <Ionicons name="checkmark" size={20} color={AppTheme.orange} />
+                            )}
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <View style={{ padding: 16, alignItems: 'center' }}>
+                          <ThemedText variant="muted" size="sm">Aucune destination trouvée</ThemedText>
+                        </View>
+                      )}
                     </ScrollView>
                   </View>
                 )}
@@ -306,6 +357,16 @@ export function QuoteEstimationModal({ visible, onClose, vehicle }: QuoteEstimat
                       </TouchableOpacity>
                     ))}
                   </View>
+                </View>
+              )}
+
+              {/* Groupage Warning */}
+              {selectedShippingType === 'groupage' && selectedDestination && (
+                <View style={[styles.note, { backgroundColor: '#FEF3C7', marginBottom: 16 }]}>
+                  <Ionicons name="warning" size={18} color="#D97706" />
+                  <ThemedText size="xs" style={{ flex: 1, marginLeft: 8, color: '#92400E' }}>
+                    {t('quotes.groupageWarning', language) || 'Le groupage maritime est soumis à disponibilité et peut entraîner des délais supplémentaires.'}
+                  </ThemedText>
                 </View>
               )}
 
@@ -452,6 +513,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
   },
   dropdownItem: {
     flexDirection: 'row',
