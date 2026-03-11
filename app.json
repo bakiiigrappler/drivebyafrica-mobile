@@ -2,7 +2,7 @@
   "expo": {
     "name": "Driveby Africa",
     "slug": "drivebyafrica",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "drivebyafrica",
@@ -22,7 +22,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0A0F14"
       },
-      "package": "com.drivebyafrica.mobile"
+      "package": "com.drivebyafrica.mobile",
+      "versionCode": 2
     },
     "web": {
       "bundler": "metro",
