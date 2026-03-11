@@ -12,6 +12,7 @@ import { ThemedView } from '@/components/ui/ThemedView';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { useVehicles, useFavorites } from '@/hooks';
 import { useAuthStore, useFilterStore, useSettingsStore, useCartStore } from '@/store';
+import { useCurrency } from '@/hooks/useCurrency';
 import { t } from '@/lib/i18n';
 import { getFirstValidImage, PLACEHOLDER_IMAGE } from '@/lib/images';
 import type { Vehicle } from '@/types';
@@ -85,6 +86,7 @@ export default function ExploreScreen() {
   const { favoriteIds, toggleFavorite } = useFavorites();
   const { language } = useSettingsStore();
   const { user } = useAuthStore();
+  const { formatVehiclePrice, getExportTaxAmount } = useCurrency();
   const cartItemCount = useCartStore((s) => s.items.length);
   const [activeSource, setActiveSource] = useState<'all' | 'korea' | 'china' | 'dubai'>(filters.source || 'all');
   const videoPlayer = useVideoPlayer(require('@/assets/videos/hero-video.mp4'), (player) => {
@@ -173,7 +175,8 @@ export default function ExploreScreen() {
 
   const renderVehicleCard = ({ item }: { item: Vehicle }) => {
     const priceUsd = item.current_price_usd || item.start_price_usd || 0;
-    const priceFcfa = Math.round(priceUsd * 600);
+    const formattedPrice = formatVehiclePrice(priceUsd, item.source);
+    const hasExportTax = getExportTaxAmount(item.source) > 0;
     const isFavorite = favoriteIds.has(item.id);
     const sourceLabel = item.source === 'korea' ? t('countries.korea', language) : item.source === 'china' ? t('countries.china', language) : t('countries.dubai', language);
     const sourceFlag = item.source === 'korea' ? '🇰🇷' : item.source === 'china' ? '🇨🇳' : '🇦🇪';
@@ -252,7 +255,7 @@ export default function ExploreScreen() {
           {/* Price */}
           <View style={styles.priceContainer}>
             <ThemedText style={styles.price}>
-              {priceUsd > 0 ? `${priceFcfa.toLocaleString()} FCFA` : t('vehicleDetail.onRequest', language)}
+              {priceUsd > 0 ? formattedPrice : t('vehicleDetail.onRequest', language)}
             </ThemedText>
             <ThemedText style={[styles.priceLabel, { color: colors.textMuted }]}>
               {t('vehicleDetail.fobPrice', language)}

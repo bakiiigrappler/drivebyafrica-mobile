@@ -1,4 +1,4 @@
-import { Modal, View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -13,7 +13,11 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { PaymentWebView } from '@/components/payment/PaymentWebView';
 import { PaymentVerificationView } from '@/components/payment/PaymentVerificationView';
 import { createPayment, type PaymentStatusResult } from '@/lib/payment';
+import { API_URL } from '@/constants';
+import { supabase } from '@/lib/supabase';
 import type { Quote } from '@/types';
+
+const isIOS = Platform.OS === 'ios';
 
 interface QuoteValidationModalProps {
   visible: boolean;
@@ -84,7 +88,8 @@ export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidati
   ];
 
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
+  const [isWhatsAppSending, setIsWhatsAppSending] = useState(false);
+  const [whatsAppSent, setWhatsAppSent] = useState(false);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('initial');
   const [webViewData, setWebViewData] = useState<{
     portalUrl: string;
@@ -99,7 +104,8 @@ export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidati
 
   const handleClose = () => {
     setIsPaymentLoading(false);
-    setIsDemoLoading(false);
+    setIsWhatsAppSending(false);
+    setWhatsAppSent(false);
     setPaymentStep('initial');
     setWebViewData(null);
     onClose();
@@ -225,21 +231,60 @@ export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidati
     } catch (error) {
       console.error('Order creation error:', error);
       showSnackbar({ message: 'Erreur lors de la création de la commande', type: 'error' });
-      setIsDemoLoading(false);
     }
   };
 
-  const handleDemoPayment = async () => {
+  // iOS: send WhatsApp message with payment link via web API
+  const handleiOSValidation = async () => {
     if (!user) {
       showSnackbar({ message: 'Vous devez être connecté', type: 'error' });
       return;
     }
 
-    setIsDemoLoading(true);
-    showSnackbar({ message: 'Simulation du paiement en cours...', type: 'info' });
+    const whatsappNumber = profile?.whatsapp_number;
+    if (!whatsappNumber) {
+      showSnackbar({ message: 'Veuillez ajouter votre numéro WhatsApp dans votre profil', type: 'warning', duration: 4000 });
+      return;
+    }
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    await processSuccessfulPayment();
+    setIsWhatsAppSending(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const quoteNumbers = quotes.map(q => q.quote_number).join(', ');
+
+      const response = await fetch(`${API_URL}/api/whatsapp/send-payment-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          whatsappNumber,
+          customerName: profile?.full_name || '',
+          quoteNumbers,
+          vehiclesSummary: quotes.map(q => `${q.vehicle_make} ${q.vehicle_model}`).join(' + '),
+          depositAmount: totalDepositUSD,
+          depositFormatted: depositFormatted,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setWhatsAppSent(true);
+        showSnackbar({ message: 'Message WhatsApp envoyé avec le lien de paiement !', type: 'success' });
+      } else {
+        showSnackbar({ message: result.error || 'Erreur lors de l\'envoi', type: 'error' });
+      }
+    } catch (error: any) {
+      console.error('WhatsApp send error:', error);
+      showSnackbar({ message: 'Impossible d\'envoyer le message WhatsApp', type: 'error' });
+    } finally {
+      setIsWhatsAppSending(false);
+    }
   };
 
   const formatCurrency = (amount: number) =>
@@ -400,41 +445,65 @@ export function QuoteValidationModal({ visible, onClose, quotes }: QuoteValidati
                 </View>
               </View>
 
-              {/* Main Payment Button */}
-              <TouchableOpacity
-                style={[styles.payButton, { backgroundColor: AppTheme.orange }]}
-                onPress={handlePayment}
-                disabled={isPaymentLoading || isDemoLoading}
-              >
-                {isPaymentLoading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="lock-closed" size={20} color="#fff" />
-                    <ThemedText style={styles.payButtonText}>
-                      Payer l'acompte - {depositFormatted}
-                    </ThemedText>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Demo Button */}
-              <TouchableOpacity
-                style={[styles.demoButton, { borderColor: AppTheme.orange }]}
-                onPress={handleDemoPayment}
-                disabled={isPaymentLoading || isDemoLoading}
-              >
-                {isDemoLoading ? (
-                  <ActivityIndicator size="small" color={AppTheme.orange} />
-                ) : (
-                  <>
-                    <Ionicons name="play" size={18} color={AppTheme.orange} />
-                    <ThemedText style={[styles.demoButtonText, { color: AppTheme.orange }]}>
-                      Mode Demo (test)
-                    </ThemedText>
-                  </>
-                )}
-              </TouchableOpacity>
+              {isIOS ? (
+                <>
+                  {/* iOS: WhatsApp notification flow */}
+                  {whatsAppSent ? (
+                    <View style={[styles.iosSuccessCard, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
+                      <Ionicons name="checkmark-circle" size={28} color="#22C55E" />
+                      <ThemedText style={{ fontWeight: '700', fontSize: 15, color: '#065F46', marginTop: 8, textAlign: 'center' }}>
+                        Lien de paiement envoyé par WhatsApp !
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 13, color: '#047857', textAlign: 'center', marginTop: 4, lineHeight: 18 }}>
+                        Consultez votre WhatsApp pour finaliser le paiement de l'acompte via le portail sécurisé.
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={[styles.iosInfoCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                        <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+                        <ThemedText style={{ flex: 1, fontSize: 13, color: '#1E40AF', lineHeight: 18, marginLeft: 10 }}>
+                          Pour des raisons de sécurité sur iOS, le paiement se fait via le portail web. Vous recevrez un lien de paiement par WhatsApp.
+                        </ThemedText>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.payButton, { backgroundColor: '#25D366' }]}
+                        onPress={handleiOSValidation}
+                        disabled={isWhatsAppSending}
+                      >
+                        {isWhatsAppSending ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <>
+                            <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+                            <ThemedText style={styles.payButtonText}>
+                              Recevoir le lien de paiement
+                            </ThemedText>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
+              ) : (
+                /* Android: Direct payment button */
+                <TouchableOpacity
+                  style={[styles.payButton, { backgroundColor: AppTheme.orange }]}
+                  onPress={handlePayment}
+                  disabled={isPaymentLoading}
+                >
+                  {isPaymentLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="lock-closed" size={20} color="#fff" />
+                      <ThemedText style={styles.payButtonText}>
+                        Payer l'acompte - {depositFormatted}
+                      </ThemedText>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
 
@@ -701,19 +770,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  demoButton: {
+  iosSuccessCard: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  iosInfoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  demoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: 12,
   },
   footer: {
     padding: 16,

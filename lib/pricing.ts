@@ -8,7 +8,7 @@ export const INSPECTION_FEE_XAF = 225000; // 225,000 FCFA for inspection and doc
 export const INSPECTION_FEE_USD = 350; // ~350 USD for inspection and documents
 
 // XAF to USD rate
-export const XAF_RATE = 615;
+export const XAF_RATE = 630;
 
 // Export taxes by source country (in USD)
 export const EXPORT_TAX_USD: Record<string, number> = {

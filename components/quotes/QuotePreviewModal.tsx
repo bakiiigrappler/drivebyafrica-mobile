@@ -270,23 +270,25 @@ ${data.costs.exportTaxXAF > 0 ? `• Taxe export: ${formatFCFA(data.costs.export
 
             {/* Header Section */}
             <View style={styles.documentHeader}>
-              <View>
+              <View style={styles.logoSection}>
                 <ThemedText style={styles.logoText}>
                   <ThemedText style={{ color: AppTheme.orange }}>driveby</ThemedText>
                   <ThemedText style={{ fontWeight: '800' }}>AFRICA</ThemedText>
                 </ThemedText>
-                <ThemedText variant="muted" size="xs">
-                  Votre partenaire d'importation automobile
+                <ThemedText variant="muted" size="xs" numberOfLines={1}>
+                  Import automobile
                 </ThemedText>
               </View>
 
               <View style={[styles.quoteInfoBox, { backgroundColor: AppTheme.orange + '15', borderColor: AppTheme.orange + '30' }]}>
                 <ThemedText style={styles.quoteLabel}>DEVIS N°</ThemedText>
-                <ThemedText style={styles.quoteNumberText}>{quoteNumber}</ThemedText>
-                <ThemedText variant="muted" size="xs">
+                <ThemedText style={styles.quoteNumberText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {quoteNumber}
+                </ThemedText>
+                <ThemedText variant="muted" size="xs" numberOfLines={1}>
                   Émis le {formatDate(createdAt)}
                 </ThemedText>
-                <ThemedText variant="muted" size="xs" style={{ color: isExpired ? '#EF4444' : colors.textMuted }}>
+                <ThemedText variant="muted" size="xs" numberOfLines={1} style={{ color: isExpired ? '#EF4444' : colors.textMuted }}>
                   Valable jusqu'au {formatDate(validUntil)}
                 </ThemedText>
               </View>
@@ -634,18 +636,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: 24,
-    paddingBottom: 20,
+    padding: 20,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  logoSection: {
+    flexShrink: 1,
   },
   logoText: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '600',
   },
   quoteInfoBox: {
-    padding: 16,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'flex-end',
+    flexShrink: 1,
+    maxWidth: '55%',
   },
   quoteLabel: {
     fontSize: 10,

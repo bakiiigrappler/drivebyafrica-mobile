@@ -18,10 +18,10 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'EUR', name: 'Euro', symbol: '€', rateToUsd: 0.92, countries: ['France', 'Belgique', 'Réunion', 'Mayotte'] },
 
   // Zone Franc CFA BEAC (Afrique Centrale)
-  { code: 'XAF', name: 'Franc CFA BEAC', symbol: 'FCFA', rateToUsd: 615, countries: ['Cameroun', 'Gabon', 'Congo', 'Centrafrique', 'Tchad', 'Guinée Équatoriale'] },
+  { code: 'XAF', name: 'Franc CFA BEAC', symbol: 'FCFA', rateToUsd: 630, countries: ['Cameroun', 'Gabon', 'Congo', 'Centrafrique', 'Tchad', 'Guinée Équatoriale'] },
 
   // Zone Franc CFA BCEAO (Afrique de l'Ouest)
-  { code: 'XOF', name: 'Franc CFA BCEAO', symbol: 'FCFA', rateToUsd: 615, countries: ['Sénégal', 'Mali', 'Burkina Faso', 'Bénin', 'Togo', 'Niger', "Côte d'Ivoire", 'Guinée-Bissau'] },
+  { code: 'XOF', name: 'Franc CFA BCEAO', symbol: 'FCFA', rateToUsd: 630, countries: ['Sénégal', 'Mali', 'Burkina Faso', 'Bénin', 'Togo', 'Niger', "Côte d'Ivoire", 'Guinée-Bissau'] },
 
   // Afrique de l'Ouest
   { code: 'NGN', name: 'Naira nigérian', symbol: '₦', rateToUsd: 1550, countries: ['Nigeria'] },
